@@ -2,5 +2,11 @@ flask
 flask-cors
 weaviate-client
 requests
-Pillow==10.0.0
-
+Pillow
+typing-extensions
+transformers
+numpy<2
+./ml-mobileclip
+Pillow>=10.0.0
+platformdirs>=3.0.0
+osxmetadata
