@@ -49,6 +49,7 @@ app.add_middleware(
 
 @app.get("/api/search")
 async def search_images(q: str = ""):
+    print(f'searching - "{q}"')
     results = await weaviate_client.search_images(q)
     #print([r.properties for r in results])
     return [r.properties for r in results]
