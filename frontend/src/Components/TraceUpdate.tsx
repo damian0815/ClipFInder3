@@ -1,6 +1,9 @@
 import {useEffect, useRef} from "react";
 
 function useTraceUpdate(props: any) {
+  if (!props) {
+    return
+  }
   const prev = useRef(props);
   useEffect(() => {
     const changedProps = Object.entries(props).reduce((ps: any, [k, v]) => {

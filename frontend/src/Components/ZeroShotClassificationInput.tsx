@@ -33,13 +33,12 @@ const ZeroShotClassificationInput = () => {
   };
 
   return (
-      <div className="space-y-4">
+      <div className="space-y-4 w-19/20">
         <h1 className="text-3xl font-bold underline">
           Hello world!
         </h1>
         {query.classes.map((clipInput, index) => (
           <div key={index} className="relative">
-
             <button
                 onClick={() => removeClass(index)}
                 className="absolute -right-10 top-2 p-2 text-gray-400 hover:text-red-500"

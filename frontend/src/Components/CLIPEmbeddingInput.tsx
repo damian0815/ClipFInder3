@@ -31,20 +31,20 @@ const CLIPEmbeddingInput = ({ value, onChange, className = '' }: CLIPEmbeddingIn
 
   return (
     <div className={`border rounded-lg p-4 ${className}`}>
-      <div className="space-y-4">
+      <div className="flex space-y-0">
         {value.texts.map((text, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <GripVertical className="text-gray-400" size={20} />
+          <div key={index} className="flex items-center gap-0">
+            {/*<GripVertical className="text-gray-400" size={20} />*/}
             <input
               type="text"
               value={text}
               onChange={(e) => updateText(index, e.target.value)}
               placeholder="Enter text..."
-              className="flex-1 px-3 py-2 border rounded-md"
+              className="flex-1 h-11 px-3 py-2 border rounded-md"
             />
             <button
               onClick={() => removeText(index)}
-              className="p-2 text-gray-400 hover:text-red-500"
+              className="p-2 mr-3 text-gray-400 hover:text-red-500"
             >
               <Trash2 size={20} />
             </button>
@@ -53,7 +53,7 @@ const CLIPEmbeddingInput = ({ value, onChange, className = '' }: CLIPEmbeddingIn
 
         <button
           onClick={addText}
-          className="w-full px-4 py-2 border rounded-md hover:bg-gray-50 flex items-center justify-center"
+          className="px-4 h-11 py-2 border rounded-md hover:bg-gray-50 flex items-center justify-center"
         >
           <Plus size={20} className="mr-2" />
           Add Text

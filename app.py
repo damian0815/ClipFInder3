@@ -19,13 +19,8 @@ logging.basicConfig(level=logging.DEBUG,
                            "%(module)s:%(funcName)s:%(lineno)d - %(message)s")
 logger = logging.getLogger(__name__)
 
-weaviate_client = WeaviateClient(
-            clip_model=MobileClipModel(),
-            persistence_data_path="weaviate_data",
-            #host='127.0.0.1',
-            #port=8079,
-            #grpc_port=50050
-        )
+embedding_store = ClipEmbeddingStore()
+
 thumbnail_provider = ThumbnailProvider()
 
 @asynccontextmanager
