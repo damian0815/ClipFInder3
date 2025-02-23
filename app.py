@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import os
 
+from backend.clip_embedding_provider import ClipEmbeddingStoreSimple, Query
 from backend.mobile_clip_model import MobileClipModel
 from backend.thumbnail_provider import ThumbnailProvider
 from backend.weaviate_client import WeaviateClient
@@ -19,19 +20,12 @@ logging.basicConfig(level=logging.DEBUG,
                            "%(module)s:%(funcName)s:%(lineno)d - %(message)s")
 logger = logging.getLogger(__name__)
 
-embedding_store = ClipEmbeddingStore()
+embedding_store = ClipEmbeddingStoreSimple(clip_model=MobileClipModel().load_model(),
+                                           store_file='dev_embedding_store_simple.pt')
 
 thumbnail_provider = ThumbnailProvider()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("connecting to weaviate client")
-    await weaviate_client.client.connect()
-    yield
-    logger.info("closing weaviate client")
-    await weaviate_client.client.close()
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 # Add CORS middleware
 app.add_middleware(
@@ -45,9 +39,14 @@ app.add_middleware(
 @app.get("/api/search")
 async def search_images(q: str = ""):
     print(f'searching - "{q}"')
-    results = await weaviate_client.search_images(q)
-    #print([r.properties for r in results])
-    return [r.properties for r in results]
+    query = Query.text_query(q)
+    results = embedding_store.search_images(query=query)
+    return [{
+        'id': r.id,
+        'path': r.path,
+        'distance': r.distance,
+        'tags': []
+    } for r in results]
 
 @app.get("/api/image/{file_path:path}")
 async def serve_image(file_path: str):
@@ -67,9 +66,9 @@ async def populate_database(request: PopulateRequest):
             detail=f"Directory '{request.image_dir}' does not exist"
         )
     logger.info(f"populating database from directory {request.image_dir}")
-    result = await weaviate_client.populate_from_directory(request.image_dir)
-    logger.info(f"await returned")
-    return result
+    num_images_added = embedding_store.add_images_recursively(request.image_dir)
+    logger.info(f"populating done returned")
+    return {'message': f'added {num_images_added} images to embedding store'}
 
 @app.get("/api/thumbnail/{filename:path}")
 async def serve_thumbnail(filename: str):
@@ -85,5 +84,5 @@ async def serve_thumbnail(filename: str):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 

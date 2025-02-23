@@ -8,3 +8,4 @@ __pycache__
 weaviate_data
 .idea
 .vscode
+*.pt
