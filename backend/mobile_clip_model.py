@@ -78,6 +78,5 @@ class MobileClipModel(ClipModel):
             self.load_model()
         text = self.tokenizer([text])
         with torch.no_grad(), torch.cuda.amp.autocast():
-            text_features = self.model.encode_text(text)
-            text_features /= text_features.norm(dim=-1, keepdim=True)
+            text_features = self.model.encode_text(text, normalize=True)
         return text_features[0]
