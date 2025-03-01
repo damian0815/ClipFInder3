@@ -1,12 +1,9 @@
 import { Plus, Trash2 } from 'lucide-react';
-
-type CLIPEmbeddingInput = {
-  texts: string[];
-};
+import EmbeddingInputData from "@/Datatypes/EmbeddingInputData.tsx";
 
 interface CLIPEmbeddingInputProps {
-  value: CLIPEmbeddingInput;
-  onChange: (value: CLIPEmbeddingInput) => void;
+  value: EmbeddingInputData;
+  onChange: (value: EmbeddingInputData) => void;
   className?: string;
 }
 

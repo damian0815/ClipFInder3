@@ -15,6 +15,13 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     const [embeddingInput, setEmbeddingInput] = useState<EmbeddingInputData|undefined>(undefined)
     const [images, setImages] = useState<Image[]>([]);
+    const [selectedImages, setSelectedImages] = useState([]);
+
+    const handleSelect = (images) => {
+        setSelectedImages(images);
+        console.log("Selected Images:", images);
+    };
+
 
     useEffect(() => {
         if (embeddingInput) {
@@ -28,7 +35,7 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     return <>
         <EmbeddingInputs setEmbeddingInput={setEmbeddingInput} />.
-        <ImageResultsGrid images={images} />
+        <ImageResultsGrid images={images} onSelect={handleSelect}/>
     </>
 
 

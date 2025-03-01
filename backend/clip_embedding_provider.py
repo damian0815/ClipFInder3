@@ -27,14 +27,25 @@ class QueryResult:
     distance: float
 
 
-class ClipEmbeddingStore(Protocol):
-    def search_images(self, query: Query) -> [QueryResult]:
+class EmbeddingStore(Protocol):
+
+    @property
+    def all_image_embeddings(self) -> torch.Tensor:
+        ...
+
+    def get_image_embedding(self, path: str) -> torch.Tensor:
+        ...
+
+    def get_text_embedding(self, text: str) -> torch.Tensor:
+        ...
+
+    def search_images(self, query: Query, limit=100) -> List[QueryResult]:
         ...
 
     def has_image(self, path: str) -> bool:
         ...
 
-    def add_images(self, paths: list[str]):
+    def add_images(self, paths: list[str]) -> torch.Tensor:
         ...
 
     def add_images_recursively(self, root_dir: str) -> int:
@@ -53,7 +64,7 @@ class ClipEmbeddingStore(Protocol):
         return len(images_to_add)
 
 
-class ClipEmbeddingStoreSimple(ClipEmbeddingStore):
+class SimpleClipEmbeddingStore(EmbeddingStore):
     def __init__(self, clip_model: ClipModel, store_file: str = None):
         self.store_file = store_file
         self.clip_model = clip_model
@@ -65,6 +76,10 @@ class ClipEmbeddingStoreSimple(ClipEmbeddingStore):
             self.image_embeddings = torch.empty([0, clip_model.embedding_dim])
             self.image_paths = []
             self.image_ids = []
+
+    @property
+    def all_image_embeddings(self) -> torch.Tensor:
+        return self.image_embeddings
 
     def get_image_embedding(self, path: str) -> torch.Tensor:
         try:

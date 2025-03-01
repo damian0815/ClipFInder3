@@ -6,8 +6,7 @@ import './Style/Collapsible.css'
 import PopulateDatabase from "@/Components/PopulateDatabase.tsx";
 import Collapsible from "react-collapsible";
 import DistanceQuery from "@/Components/DistanceQuery.tsx";
-//import ZeroShotClassificationQuery from "@/Components/ZeroShotClassificationQuery.tsx";
-import ZeroShotClassificationInput from "@/Components/ZeroShotClassificationInput.tsx";
+import ZeroShotClassificationQuery from "@/Components/ZeroShotClassificationQuery.tsx";
 
 function App() {
 
@@ -31,8 +30,7 @@ function App() {
                 <DistanceQuery />
             </TabPanel>
             <TabPanel>
-                {/*<ZeroShotClassificationQuery />*/}
-                <ZeroShotClassificationInput />
+                <ZeroShotClassificationQuery />
             </TabPanel>
         </Tabs>
 

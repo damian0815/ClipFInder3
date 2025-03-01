@@ -1,16 +1,25 @@
-import { useState } from 'react';
+import {useEffect, useState} from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import CLIPEmbeddingInput from './CLIPEmbeddingInput.tsx';
 import "../App.css"
+import EmbeddingInputData from "@/Datatypes/EmbeddingInputData.tsx";
 
-type ZeroShotClassificationQueryInput = {
-  classes: CLIPEmbeddingInput[];
+export type ZeroShotClassificationQueryInput = {
+  classes: EmbeddingInputData[];
 };
 
-const ZeroShotClassificationInput = () => {
+type ZeroShotClassificationInputProps = {
+  setQuery: (value: ZeroShotClassificationQueryInput) => void
+}
+
+export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputProps) => {
   const [query, setQuery] = useState<ZeroShotClassificationQueryInput>({
     classes: [{ texts: [''] }]
   });
+
+  useEffect(() => {
+    props.setQuery(query)
+  }, [query]);
 
   const addClass = () => {
     setQuery({
@@ -24,7 +33,7 @@ const ZeroShotClassificationInput = () => {
     });
   };
 
-  const updateClass = (index: number, newValue: CLIPEmbeddingInput) => {
+  const updateClass = (index: number, newValue: EmbeddingInputData) => {
     setQuery({
       classes: query.classes.map((cls, i) =>
         i === index ? newValue : cls
@@ -34,9 +43,6 @@ const ZeroShotClassificationInput = () => {
 
   return (
       <div className="space-y-4 w-19/20">
-        <h1 className="text-3xl font-bold underline">
-          Hello world!
-        </h1>
         {query.classes.map((clipInput, index) => (
           <div key={index} className="relative">
             <button
