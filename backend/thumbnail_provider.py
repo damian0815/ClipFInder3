@@ -5,15 +5,15 @@ import platformdirs
 from PIL import ImageOps
 
 class ThumbnailProvider:
-    def __init__(self, thumbnail_size=(224, 224)):
+    def __init__(self, thumbnail_size=(512, 512)):
         self.thumbnail_size = thumbnail_size
-        self.cache_dir = Path(platformdirs.user_cache_dir("clipfinder3", "thumbnails"))
+        self.cache_dir = Path(platformdirs.user_cache_dir("clipfinder3")) / "thumbnails"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def get_thumbnail_path(self, original_path: str) -> Path:
         """Generate a unique thumbnail path based on the original image path."""
         # Create a hash of the original path to use as the thumbnail filename
-        path_hash = hashlib.sha256(original_path.encode()).hexdigest()[:16]
+        path_hash = hashlib.sha256(original_path.encode()).hexdigest()
         return self.cache_dir / f"{path_hash}.jpg"
 
     def get_or_create_thumbnail(self, image_path: str) -> Path:

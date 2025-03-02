@@ -1123,7 +1123,7 @@ postcss@^8.4.43, postcss@^8.5.2:
     picocolors "^1.1.1"
     source-map-js "^1.2.1"
 
-prop-types@^15.5.0:
+prop-types@^15.5.0, prop-types@^15.6.2:
   version "15.8.1"
   resolved "https://registry.yarnpkg.com/prop-types/-/prop-types-15.8.1.tgz#67d87bf1a694f48435cf332c24af10214a3140b5"
   integrity sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==
@@ -1167,6 +1167,27 @@ react-tabs@^6.1.0:
   dependencies:
     clsx "^2.0.0"
     prop-types "^15.5.0"
+
+react-zoom-pan-pinch@^3.7.0:
+  version "3.7.0"
+  resolved "https://registry.yarnpkg.com/react-zoom-pan-pinch/-/react-zoom-pan-pinch-3.7.0.tgz#7db4d2ec49c316eb20f71c56e9012eeb3ef4b504"
+  integrity sha512-UmReVZ0TxlKzxSbYiAj+LeGRW8s8LraAFTXRAxzMYnNRgGPsxCudwZKVkjvGmjtx7SW/hZamt69NUmGf4xrkXA==
+
+react-zoom-pan@^0.1.48:
+  version "0.1.48"
+  resolved "https://registry.yarnpkg.com/react-zoom-pan/-/react-zoom-pan-0.1.48.tgz#cf8404d1dc7e716c7e4ad387b33967fd6b75f766"
+  integrity sha512-rsQkxNHYeeZjnN9zhmcH1e1OMIPjNVMYQIGLwcCUEwq2DNpGIEXcwqyk7g4YHXKMD0D38ObMLw+lfHSKovrTWg==
+  dependencies:
+    react "^16.13.1"
+
+react@^16.13.1:
+  version "16.14.0"
+  resolved "https://registry.yarnpkg.com/react/-/react-16.14.0.tgz#94d776ddd0aaa37da3eda8fc5b6b18a4c9a3114d"
+  integrity sha512-0X2CImDkJGApiAlcf0ODKIneSwBPhqJawOa5wCtKbu7ZECrmS26NvtSILynQ66cgkT/RJ4LidJOc3bUESwmU8g==
+  dependencies:
+    loose-envify "^1.1.0"
+    object-assign "^4.1.1"
+    prop-types "^15.6.2"
 
 react@^18.2.0:
   version "18.3.1"

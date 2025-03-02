@@ -1,4 +1,6 @@
 import Image, {ResultImage} from "@/Components/Image.tsx";
+import {TransformWrapper, TransformComponent, useTransformContext, useTransformComponent} from "react-zoom-pan-pinch";
+import {useState} from "react";
 
 
 type ImageResults2DProps = {
@@ -10,25 +12,47 @@ type ImageResults2DProps = {
 
 function ImageResults2D(props: ImageResults2DProps) {
 
-
     return <div className="image-2d relative w-full aspect-square border border-gray-400">
-        {props.images.map((img, index) =>
-            <div key={index}
-                 className={"absolute w-12 h-12 rounded transform -translate-x-1/2 -translate-y-1/2"}
-                 style={{
-                        left: `${props.positions[index][0] * 100}%`,
-                        top: `${props.positions[index][1] * 100}%`,
-                }}
+        <TransformWrapper>
+            <TransformComponent
+                wrapperStyle={{width: "100%", height: "100%"}}
+                contentStyle={{width: "100%", height: "100%"}}
             >
-                <ResultImage
-                    image={img}
-                    isSelected={false}
-                    onClick={(_) => {}}
-                />
-            </div>
-        )}
+                <ImageResults2DImages images={props.images} positions={props.positions} />
+            </TransformComponent>
+        </TransformWrapper>
     </div>
 
+}
+
+function ImageResults2DImages(props: ImageResults2DProps) {
+    const [imageScale, setImageScale] = useState<number>(1)
+
+    useTransformComponent(({state}) => {
+        if (state.scale != imageScale) {
+            setImageScale(state.scale)
+            console.log("scale:", state.scale)
+        }
+    })
+
+    return props.images.map((img, index) =>
+        <div key={index}
+                    className={"absolute rounded transform -translate-x-1/2 -translate-y-1/2"}
+                    style={{
+                        left: `${props.positions[index][0] * 100}%`,
+                        top: `${props.positions[index][1] * 100}%`,
+                        width: `${100 / imageScale}px`,
+                        height: `${100 / imageScale}px`
+                    }}
+        >
+            <ResultImage
+                image={img}
+                isSelected={false}
+                onClick={(_) => {
+                }}
+            />
+        </div>
+    )
 }
 
 
