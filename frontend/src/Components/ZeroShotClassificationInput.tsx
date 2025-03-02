@@ -2,19 +2,19 @@ import {useEffect, useState} from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import CLIPEmbeddingInput from './CLIPEmbeddingInput.tsx';
 import "../App.css"
-import EmbeddingInputData from "@/Datatypes/EmbeddingInputData.tsx";
+import {EmbeddingInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 
-export class ZeroShotClassificationQueryInput {
+export class ZeroShotClassificationInputData {
   classes: EmbeddingInputData[] = []
 }
 
 type ZeroShotClassificationInputProps = {
-  initialQuery: ZeroShotClassificationQueryInput
-  setQuery: (value: ZeroShotClassificationQueryInput) => void
+  initialQuery: ZeroShotClassificationInputData
+  setQuery: (value: ZeroShotClassificationInputData) => void
 }
 
 export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputProps) => {
-  const [query, setQuery] = useState<ZeroShotClassificationQueryInput>(props.initialQuery);
+  const [query, setQuery] = useState<ZeroShotClassificationInputData>(props.initialQuery);
 
   useEffect(() => {
     props.setQuery(query)
@@ -25,7 +25,7 @@ export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputPr
       classes: [...query.classes, {
         id: getClassId(query.classes.length),
         texts: ['']
-      }]
+      }],
     });
   };
 

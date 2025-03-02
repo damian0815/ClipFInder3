@@ -3,7 +3,35 @@ import {useState} from "react";
 import {API_BASE_URL} from "../Constants.tsx";
 
 function PopulateDatabase() {
-      const [imageDir, setImageDir] = useState<string>('');
+    const [imageDir, setImageDir] = useState<string>('');
+    const [isPopulating, setIsPopulating] = useState<boolean>(false)
+
+    function populateDatabase() {
+        if (!imageDir) {
+            alert('Please enter a valid image directory path');
+            return;
+        }
+        setIsPopulating(true);
+        fetch(`${API_BASE_URL}/api/populate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                image_dir: imageDir
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(`${data.message}`);
+        })
+        .catch(err => {
+            alert(`Error populating database: ${err}`);
+        })
+        .finally(() => {
+            setIsPopulating(false);
+        })
+    }
 
     return <>
         <input
@@ -21,28 +49,8 @@ function PopulateDatabase() {
             }}
         />
         <button
-            onClick={() => {
-                if (!imageDir) {
-                    alert('Please enter a valid image directory path');
-                    return;
-                }
-                fetch(`${API_BASE_URL}/api/populate`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        image_dir: imageDir
-                    })
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        alert(`${data.message}`);
-                    })
-                    .catch(err => {
-                        alert(`Error populating database: ${err}`);
-                    });
-            }}
+            onClick={populateDatabase}
+            disabled={isPopulating}
             style={{
                 padding: '8px 16px',
                 marginBottom: '20px',

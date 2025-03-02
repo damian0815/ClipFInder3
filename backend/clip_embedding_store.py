@@ -44,6 +44,10 @@ class EmbeddingStore(Protocol):
     def get_text_embedding(self, text: str) -> torch.Tensor:
         ...
 
+    def get_image_path(self, id: str) -> str:
+        index = self.all_image_ids.index(id)
+        return self.all_image_paths[index]
+
     def search_images(self, query: Query, limit=100) -> List[QueryResult]:
         ...
 

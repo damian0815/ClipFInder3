@@ -1,11 +1,14 @@
 import ZeroShotClassificationInput, {
-    ZeroShotClassificationQueryInput
+    ZeroShotClassificationInputData
 } from "@/Components/ZeroShotClassificationInput.tsx";
 import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import {useEffect, useState} from "react";
 import {API_BASE_URL} from "@/Constants.tsx";
 import MultiColumn from "@/Components/MultiColumn.tsx";
 import Image from "@/Components/Image.tsx";
+import {FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
+import {FilterInput} from "@/Components/FilterInput.tsx";
+import ImageResults2D from "@/Components/ImageResults2D.tsx";
 
 type ZeroShotClassificationQueryProps = {
 
@@ -15,28 +18,38 @@ type ZeroShotClassification = {
     image: Image
     best_cls: string
     entropy: number
+    order_key: number|number[]
 }
 
 let zeroShotResultsCache: ZeroShotClassification[] = []
 function getZeroShotResults() { return zeroShotResultsCache }
 function setZeroShotResults(results: ZeroShotClassification[]) { zeroShotResultsCache = results }
 
-function getLastQuery(): ZeroShotClassificationQueryInput {
+function getLastQuery(): ZeroShotClassificationInputData {
     const lastQueryJson = localStorage.getItem('zeroShot.lastQuery')
-    console.log(typeof(lastQueryJson), lastQueryJson)
+    //console.log(typeof(lastQueryJson), lastQueryJson)
     if (!lastQueryJson) {
-        return new ZeroShotClassificationQueryInput()
+        return new ZeroShotClassificationInputData()
     }
     return JSON.parse(lastQueryJson);
 }
 
+function getLastFilter(): FilterInputData {
+    const lastFilterJson = localStorage.getItem('zeroShot.lastFilter')
+    //console.log(typeof(lastQueryJson), lastQueryJson)
+    if (!lastFilterJson) {
+        return new FilterInputData()
+    }
+    return JSON.parse(lastFilterJson);
+}
 
 function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
     const [queryResults, setQueryResults] = useState<ZeroShotClassification[]>([])
-    const [queryInput, setQueryInput] = useState<ZeroShotClassificationQueryInput | undefined>(getLastQuery())
+    const [queryInput, setQueryInput] = useState<ZeroShotClassificationInputData>(getLastQuery())
+    const [filterInput, setFilterInput] = useState<FilterInputData>(getLastFilter())
     const [queryInProgress, setQueryInProgress] = useState<boolean>(false)
 
-    console.log("queryResults", getZeroShotResults())
+    //console.log("queryResults", getZeroShotResults())
 
     useEffect(() => {
         if (!queryInput) {
@@ -45,11 +58,18 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         localStorage.setItem('zeroShot.lastQuery', JSON.stringify(queryInput))
     }, [queryInput]);
 
+    useEffect(() => {
+        if (!filterInput) {
+            return
+        }
+        localStorage.setItem('zeroShot.lastFilter', JSON.stringify(filterInput))
+    }, [filterInput]);
+
     function doSearch() {
-        console.log("searching, queryInput is", queryInput)
+        //console.log("searching, queryInput is", queryInput)
         if (queryInput) {
             setQueryInProgress(true);
-            const queryBody = JSON.stringify(queryInput)
+            const queryBody = JSON.stringify({'classes': queryInput.classes, 'filters': filterInput})
             console.log(queryInput, queryBody)
             fetch(`${API_BASE_URL}/api/zero-shot-classify`, {
                 method: 'POST',
@@ -61,7 +81,7 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
                 .then(res => res.json())
                 .then(data => {
                     //setImages(data)
-                    console.log(data)
+                    //console.log(data)
                     setQueryResults(data)
                     setZeroShotResults(data)
                 })
@@ -71,30 +91,38 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         }
     }
 
-    const resultClasses = [... new Set(queryResults.map((qr) => qr.best_cls)).values()]
-    resultClasses.sort()
+    let resultClasses: string[] = []
+    if (queryResults) {
+        console.log(queryResults)
+        resultClasses = [...new Set(queryResults.map((qr) => qr.best_cls)).values()]
+        resultClasses.sort()
+    }
 
     return <>
         <ZeroShotClassificationInput initialQuery={getLastQuery()} setQuery={setQueryInput}/>
+        <FilterInput initialFilterInput={getLastFilter()} setFilterInput={setFilterInput} />
         <button
             onClick={() => {doSearch()}}
             disabled={queryInProgress}
             >{queryInProgress ? "⏳ Searching..." : "🔎 Search"}</button>
         {/*<!--<ImageResultsGrid images={images} onSelect={handleSelect}/>-->*/}
         <pre>{JSON.stringify(queryInput?.classes)}</pre>
-        {queryInput && (queryResults.length > 0) &&
-            <MultiColumn columns={resultClasses.length} >
-                {resultClasses.map((cls_id) => {
-                    const thisClsResults = queryResults.filter((qr) => qr.best_cls === cls_id);
-                    //return <div>{JSON.stringify(thisClsResults)}</div>
-                    thisClsResults.sort((a, b) => a.entropy - b.entropy);
-                    const thisClsImages = thisClsResults.map((qr) => qr.image)
-                    return <>
-                     <pre>{cls_id}</pre>
-                    <ImageResultsGrid images={thisClsImages} onSelect={() => {}} />
-                    </>
-                })}
-            </MultiColumn>
+        {queryInput && (queryResults.length > 0) && <>
+            {/*<MultiColumn columns={resultClasses.length} >
+                    {resultClasses.map((cls_id) => {
+                        const thisClsResults = queryResults.filter((qr) => qr.best_cls === cls_id);
+                        //return <div>{JSON.stringify(thisClsResults)}</div>
+                        thisClsResults.sort((a, b) => a.entropy - b.entropy);
+                        const thisClsImages = thisClsResults.map((qr) => qr.image)
+                        return <>
+                         <pre>{cls_id}</pre>
+                        <ImageResultsGrid images={thisClsImages} onSelect={() => {}} />
+                        </>
+                    })}
+                </MultiColumn>*/}
+                <ImageResults2D images={queryResults.map((qr) => qr.image)}
+                                positions={queryResults.map((qr) => qr.order_key as number[])} />
+            </>
         }
 
 

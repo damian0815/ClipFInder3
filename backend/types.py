@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from enum import Enum
 
 from pydantic import BaseModel
+from pydantic.alias_generators import to_camel
 
 
 class EmbeddingRequest(BaseModel):
@@ -16,8 +18,20 @@ class EmbeddingRequest(BaseModel):
         )
 
 
+class ResultFilters(BaseModel):
+    path_contains: list[str] = []
+    path_not_contains: list[str] = []
+    required_tags_and: list[str] = []
+    required_tags_or: list[str] = []
+    excluded_tags: list[str] = []
+
+    class Config:
+        alias_generator = to_camel
+
+
 class ZeroShotClassifyRequest(BaseModel):
     classes: list[EmbeddingRequest]
+    filters: ResultFilters
 
     @property
     def is_empty(self) -> bool:
@@ -38,5 +52,6 @@ class ZeroShotClassification:
     image: ImageResponse
     best_cls: str
     entropy: float
+    order_key: float|list[float]
 
 

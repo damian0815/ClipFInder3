@@ -35,7 +35,8 @@ def load_mock_model():
     return MockClipModel()
 
 embedding_store = SimpleClipEmbeddingStore(load_model=load_mobile_clip_model,
-                                           store_file='dev_embedding_store_simple.pt')
+                                           store_file='dev_embedding_store_simple.pt',
+                                           repair_store_file_case=True)
 print("making thumbnail provider")
 
 thumbnail_provider = ThumbnailProvider()
@@ -62,10 +63,11 @@ async def search_images(q: str = ""):
             for r in results]
 
 
-@app.get("/api/image/{file_path:path}")
-async def serve_image(file_path: str):
+@app.get("/api/image/{id}")
+async def serve_image(id: str):
+    file_path = embedding_store.get_image_path(id)
     if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="Image not found")
+        raise HTTPException(status_code=404, detail=f"Image not found: {file_path}")
     return FileResponse(file_path)
 
 
@@ -95,17 +97,14 @@ async def populate_database(request: PopulateRequest):
     return {'message': f'added {num_images_added} images to embedding store'}
 
 
-@app.get("/api/thumbnail/{filename:path}")
-async def serve_thumbnail(filename: str):
-    try:
-        original_path = os.path.join('images', filename)
-        if not os.path.isfile(original_path):
-            raise HTTPException(status_code=404, detail="Image not found")
+@app.get("/api/thumbnail/{id}")
+async def serve_thumbnail(id: str):
+    original_path = embedding_store.get_image_path(id)
+    if not os.path.isfile(original_path):
+        raise HTTPException(status_code=404, detail=f"Image not found: {original_path}")
 
-        thumbnail_path = thumbnail_provider.get_or_create_thumbnail(original_path)
-        return FileResponse(thumbnail_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    thumbnail_path = thumbnail_provider.get_or_create_thumbnail(original_path)
+    return FileResponse(thumbnail_path)
 
 
 if __name__ == '__main__':

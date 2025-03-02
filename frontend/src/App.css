@@ -14,9 +14,18 @@
   
   img {
     width: 100%;
-    height: 200px;
     object-fit: contain;
-    border-radius: 0px;
+    border-radius: 0;
+  }
+
+  .image-grid img {
+    height: 200px
+  }
+
+  .image-2d img:hover {
+    z-index:555555;
+    background: blue;
+    border: 1px solid crimson;
   }
   
   /*input {

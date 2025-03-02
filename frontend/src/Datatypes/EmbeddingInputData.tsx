@@ -1,6 +1,5 @@
-import distanceQuery from "@/Components/DistanceQuery.tsx";
 
-export default class EmbeddingInputData {
+export class EmbeddingInputData {
     id: string
     texts: string[];
     constructor(id: string, texts: string[]=[]) {
@@ -9,3 +8,10 @@ export default class EmbeddingInputData {
     }
 }
 
+export class FilterInputData {
+    pathContains: string[] = []
+    pathNotContains: string[] = []
+    required_tags_and: string[] = []
+    required_tags_or: string[] = []
+    excluded_tags: string[] = []
+}

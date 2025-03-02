@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import DebouncedTextField from "@/Components/DebouncedTextField.tsx";
-import EmbeddingInputData from "@/Datatypes/EmbeddingInputData.tsx";
+import {EmbeddingInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import useTraceUpdate from "@/Components/TraceUpdate.tsx";
 
 

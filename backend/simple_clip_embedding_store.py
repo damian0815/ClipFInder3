@@ -9,13 +9,19 @@ from backend.clip_model import ClipModel
 
 
 class SimpleClipEmbeddingStore(EmbeddingStore):
-    def __init__(self, load_model: Callable[[], ClipModel], embedding_dim=512, store_file: str = None):
+    def __init__(self, load_model: Callable[[], ClipModel],
+                 embedding_dim=512,
+                 store_file: str = None,
+                 repair_store_file_case: bool=False):
         self.store_file = store_file
         self.load_model = load_model
         self._clip_model = None
         self.embedding_dim = embedding_dim
         if store_file is not None and os.path.exists(store_file):
             self._load_from_store()
+            if repair_store_file_case:
+                self.image_paths = _repair_image_paths_case(self.all_image_paths)
+
         else:
             self.text_embeddings = torch.empty([0, self.embedding_dim])
             self.texts = []
@@ -43,7 +49,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
 
     def get_image_embedding(self, path: str) -> torch.Tensor:
         try:
-            index = self.image_paths.index(path.lower())
+            index = self.image_paths.index(path)
             return self.image_embeddings[index]
         except ValueError:
             image_embedding = self.add_image(path)
@@ -81,7 +87,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         assert len(embeddings_to_add) == len(paths)
         self.image_embeddings = torch.cat([self.image_embeddings, torch.stack(embeddings_to_add)])
         self.image_ids = self.image_ids + [str(uuid.uuid4()) for _ in range(len(paths))]
-        self.image_paths = self.image_paths + [p.lower() for p in paths]
+        self.image_paths.extend(paths)
         self._save_to_store()
         return embeddings_to_add
 
@@ -96,7 +102,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         return embedding_to_add
 
     def has_image(self, path: str) -> bool:
-        return path.lower() in self.image_paths
+        return path in self.image_paths
 
     def _load_from_store(self):
         d = torch.load(self.store_file)
@@ -127,3 +133,22 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             'text_embeddings': self.text_embeddings,
             'texts': self.texts,
         }, self.store_file)
+
+
+def _repair_image_paths_case(paths: list[str]) -> list[str]:
+    parent_contents = {}
+
+    def get_case_correct_path(path):
+        if path == "/" or path == "":
+            return path
+        parent = os.path.dirname(path).lower()
+        case_correct_parent = get_case_correct_path(parent)
+        if parent not in parent_contents.keys():
+            parent_contents[parent] = os.listdir(case_correct_parent)
+
+        filename = os.path.basename(path).lower()
+        case_correct_filename = next(fn for fn in parent_contents[parent]
+                                     if fn.lower() == filename)
+        return os.path.join(case_correct_parent, case_correct_filename)
+
+    return [get_case_correct_path(p) for p in paths]

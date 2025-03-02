@@ -8,6 +8,7 @@ from mobileclip.modules.common.mobileone import reparameterize_model
 
 from backend.clip_model import ClipModel
 from PIL import ImageOps
+from tqdm.auto import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class MobileClipModel(ClipModel):
             self.load_model()
         image_chunks = [images[i:i+batch_size]
                         for i in range(0, len(images), batch_size)]
-        for chunk in image_chunks:
+        for chunk in tqdm(image_chunks):
             def load_images(chunk) -> Generator[Image, None, None]:
                 for path in chunk:
                     try:

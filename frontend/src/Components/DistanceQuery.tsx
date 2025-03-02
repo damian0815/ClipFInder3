@@ -3,7 +3,8 @@ import {API_BASE_URL} from "@/Constants.tsx";
 import Image from "@/Components/Image.tsx";
 import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import EmbeddingInputs from "@/Components/EmbeddingInputs.tsx";
-import EmbeddingInputData from "@/Datatypes/EmbeddingInputData.tsx";
+import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
+import {FilterInput} from "@/Components/FilterInput.tsx";
 
 
 type DistanceQueryProps = {
@@ -14,6 +15,7 @@ type DistanceQueryProps = {
 function DistanceQuery(props: DistanceQueryProps) {
 
     const [embeddingInput, setEmbeddingInput] = useState<EmbeddingInputData|undefined>(undefined)
+    const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
     const [images, setImages] = useState<Image[]>([]);
     const [selectedImages, setSelectedImages] = useState([]);
 
@@ -34,7 +36,8 @@ function DistanceQuery(props: DistanceQueryProps) {
 
 
     return <>
-        <EmbeddingInputs id='distance_query' setEmbeddingInput={setEmbeddingInput} />.
+        <EmbeddingInputs id='distance_query' setEmbeddingInput={setEmbeddingInput} />
+        <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
         <ImageResultsGrid images={images} onSelect={handleSelect}/>
     </>
 
