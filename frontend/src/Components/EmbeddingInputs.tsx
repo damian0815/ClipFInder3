@@ -5,6 +5,7 @@ import useTraceUpdate from "@/Components/TraceUpdate.tsx";
 
 
 type EmbeddingInputsProps = {
+    id: string
     setEmbeddingInput: (value: EmbeddingInputData) => void;
 }
 
@@ -16,7 +17,7 @@ function EmbeddingInputs(props: EmbeddingInputsProps) {
     const [text, setText] = useState<string>('')
 
     useEffect(() => {
-        const newData = new EmbeddingInputData(props.embeddingInput?.id ?? undefined);
+        const newData = new EmbeddingInputData(props.id);
         newData.texts = [text]
         props.setEmbeddingInput(newData)
     }, [text])

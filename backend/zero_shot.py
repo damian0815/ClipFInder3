@@ -1,15 +1,6 @@
-from pydantic import BaseModel
-
-from backend.clip_embedding_provider import EmbeddingStore, Query
-
-
-class EmbeddingRequest(BaseModel):
-    texts: list[str] = []
-    images: list[str] = []
-
-
-class ZeroShotClassifyRequest(BaseModel):
-    classes: list[EmbeddingRequest]
+import torch
+from backend.clip_embedding_store import EmbeddingStore
+from backend.types import ZeroShotClassifyRequest, ZeroShotClassification, ImageResponse
 
 
 def do_zero_shot_classify(embedding_provider: EmbeddingStore,
@@ -17,14 +8,21 @@ def do_zero_shot_classify(embedding_provider: EmbeddingStore,
 
     cls_results = []
     for cls in request.classes:
-        cls_text_embeddings = [embedding_provider.get_text_embedding(t) for t in cls.texts]
+        cls_text_embeddings = torch.stack([embedding_provider.get_text_embedding(t) for t in cls.texts])
         if cls.images:
             raise NotImplementedError
-        similarities = cls_text_embeddings @ embedding_provider.all_image_embeddings
+        similarities = embedding_provider.all_image_embeddings @ cls_text_embeddings.T
+        cls_results.append(similarities.mean(dim=1))
 
-
-        results = embedding_provider.search_images(query, limit=None)
-        cls_results.append(results)
+    probs = torch.stack(cls_results, dim=1).softmax(dim=1)
+    entropy = -torch.sum(probs * torch.log(probs), dim=1)
+    cls_selections = probs.argmax(dim=1)
+    return [
+        ZeroShotClassification(image=ImageResponse(id=embedding_provider.all_image_ids[i],
+                                                   path=embedding_provider.all_image_paths[i]),
+                               best_cls=request.classes[cls_selections[i].item()].id,
+                               entropy=entropy[i].item())
+        for i in range(probs.shape[0])]
 
 
 

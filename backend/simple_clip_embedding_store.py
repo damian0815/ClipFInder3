@@ -1,85 +1,45 @@
 import os
 import uuid
-from dataclasses import dataclass
-from typing import Protocol, List
+from collections.abc import Callable
 
-import PIL
 import torch
-from PIL import Image
 
+from backend.clip_embedding_store import EmbeddingStore, Query, QueryResult
 from backend.clip_model import ClipModel
 
 
-@dataclass
-class Query:
-    texts: List[str]
-    images: List[str]
-
-    @staticmethod
-    def text_query(text: str):
-        return Query(texts=[text], images=[])
-
-
-@dataclass
-class QueryResult:
-    id: str
-    path: str
-    distance: float
-
-
-class EmbeddingStore(Protocol):
-
-    @property
-    def all_image_embeddings(self) -> torch.Tensor:
-        ...
-
-    def get_image_embedding(self, path: str) -> torch.Tensor:
-        ...
-
-    def get_text_embedding(self, text: str) -> torch.Tensor:
-        ...
-
-    def search_images(self, query: Query, limit=100) -> List[QueryResult]:
-        ...
-
-    def has_image(self, path: str) -> bool:
-        ...
-
-    def add_images(self, paths: list[str]) -> torch.Tensor:
-        ...
-
-    def add_images_recursively(self, root_dir: str) -> int:
-        images_to_add = []
-        for directory, _, files in os.walk(root_dir):
-            for f in files:
-                path = os.path.join(directory, f)
-                if self.has_image(path):
-                    continue
-                try:
-                    _ = Image.open(path)
-                    images_to_add.append(path)
-                except PIL.UnidentifiedImageError:
-                    continue
-        self.add_images(images_to_add)
-        return len(images_to_add)
-
-
 class SimpleClipEmbeddingStore(EmbeddingStore):
-    def __init__(self, clip_model: ClipModel, store_file: str = None):
+    def __init__(self, load_model: Callable[[], ClipModel], embedding_dim=512, store_file: str = None):
         self.store_file = store_file
-        self.clip_model = clip_model
+        self.load_model = load_model
+        self._clip_model = None
+        self.embedding_dim = embedding_dim
         if store_file is not None and os.path.exists(store_file):
             self._load_from_store()
         else:
-            self.text_embeddings = torch.empty([0, clip_model.embedding_dim])
+            self.text_embeddings = torch.empty([0, self.embedding_dim])
             self.texts = []
-            self.image_embeddings = torch.empty([0, clip_model.embedding_dim])
+            self.image_embeddings = torch.empty([0, self.embedding_dim])
             self.image_paths = []
             self.image_ids = []
 
     @property
+    def clip_model(self) -> ClipModel:
+        if self._clip_model is None:
+            self._clip_model = self.load_model()
+        return self._clip_model
+
+    @property
     def all_image_embeddings(self) -> torch.Tensor:
         return self.image_embeddings
+
+    @property
+    def all_image_ids(self) -> list[str]:
+        return self.image_ids
+
+    @property
+    def all_image_paths(self) -> list[str]:
+        return self.image_paths
 
     def get_image_embedding(self, path: str) -> torch.Tensor:
         try:
@@ -97,7 +57,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             text_embedding = self.add_text(text)
             return text_embedding
 
-    def search_images(self, query: Query, limit=100) -> List[QueryResult]:
+    def search_images(self, query: Query, limit=100) -> list[QueryResult]:
         query_embeddings = [
             self.get_text_embedding(t)
             for t in query.texts
@@ -152,7 +112,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             self.image_paths = d['paths']
             self.image_ids = d['ids']
             self.texts = []
-            self.text_embeddings = torch.empty([0, self.clip_model.embedding_dim])
+            self.text_embeddings = torch.empty([0, self.embedding_dim])
         else:
             raise RuntimeError(f"unrecognized store version in {self.store_file}: {version}")
 

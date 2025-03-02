@@ -34,7 +34,7 @@ function DistanceQuery(props: DistanceQueryProps) {
 
 
     return <>
-        <EmbeddingInputs setEmbeddingInput={setEmbeddingInput} />.
+        <EmbeddingInputs id='distance_query' setEmbeddingInput={setEmbeddingInput} />.
         <ImageResultsGrid images={images} onSelect={handleSelect}/>
     </>
 

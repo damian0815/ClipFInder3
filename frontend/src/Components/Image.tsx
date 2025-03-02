@@ -1,6 +1,7 @@
 export default interface Image {
   id: string;
   path: string;
-  tags: string[];
+  distance: number|undefined
+  tags: string[]|undefined
 }
 

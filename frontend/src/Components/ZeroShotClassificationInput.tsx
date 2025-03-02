@@ -4,18 +4,17 @@ import CLIPEmbeddingInput from './CLIPEmbeddingInput.tsx';
 import "../App.css"
 import EmbeddingInputData from "@/Datatypes/EmbeddingInputData.tsx";
 
-export type ZeroShotClassificationQueryInput = {
-  classes: EmbeddingInputData[];
-};
+export class ZeroShotClassificationQueryInput {
+  classes: EmbeddingInputData[] = []
+}
 
 type ZeroShotClassificationInputProps = {
+  initialQuery: ZeroShotClassificationQueryInput
   setQuery: (value: ZeroShotClassificationQueryInput) => void
 }
 
 export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputProps) => {
-  const [query, setQuery] = useState<ZeroShotClassificationQueryInput>({
-    classes: [{ texts: [''] }]
-  });
+  const [query, setQuery] = useState<ZeroShotClassificationQueryInput>(props.initialQuery);
 
   useEffect(() => {
     props.setQuery(query)
@@ -23,13 +22,24 @@ export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputPr
 
   const addClass = () => {
     setQuery({
-      classes: [...query.classes, { texts: [''] }]
+      classes: [...query.classes, {
+        id: getClassId(query.classes.length),
+        texts: ['']
+      }]
     });
   };
 
+  function getClassId(index: number): string {
+    return "cls_" + index.toString().padStart(2, "0")
+  }
+
   const removeClass = (index: number) => {
+    const newClasses = query.classes.filter((_, i) => i !== index);
+    for (var i=index; i<newClasses.length; i++) {
+      newClasses[i].id = getClassId(i)
+    }
     setQuery({
-      classes: query.classes.filter((_, i) => i !== index)
+      classes: newClasses
     });
   };
 
@@ -52,6 +62,7 @@ export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputPr
               <Trash2 size={20}/>
             </button>
             <CLIPEmbeddingInput
+                id={getClassId(index)}
                 value={clipInput}
                 onChange={(newValue) => updateClass(index, newValue)}
             />
