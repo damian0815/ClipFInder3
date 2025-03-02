@@ -1,5 +1,11 @@
 import Image, {ResultImage} from "@/Components/Image.tsx";
-import {TransformWrapper, TransformComponent, useTransformContext, useTransformComponent} from "react-zoom-pan-pinch";
+import {
+    TransformWrapper,
+    TransformComponent,
+    useTransformContext,
+    useTransformComponent,
+    KeepScale
+} from "react-zoom-pan-pinch";
 import {useState} from "react";
 
 
@@ -40,17 +46,20 @@ function ImageResults2DImages(props: ImageResults2DProps) {
                     className={"absolute rounded transform -translate-x-1/2 -translate-y-1/2"}
                     style={{
                         left: `${props.positions[index][0] * 100}%`,
-                        top: `${props.positions[index][1] * 100}%`,
-                        width: `${100 / imageScale}px`,
-                        height: `${100 / imageScale}px`
+                        top: `${props.positions[index][1] * 100}%`
+                        /*width: `${100 / imageScale}px`,
+                        height: `${100 / imageScale}px`*/
                     }}
         >
+                        <KeepScale >
+
             <ResultImage
                 image={img}
                 isSelected={false}
                 onClick={(_) => {
                 }}
             />
+                </KeepScale>
         </div>
     )
 }
