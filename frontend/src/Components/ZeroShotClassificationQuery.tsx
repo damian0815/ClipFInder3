@@ -11,7 +11,7 @@ import {FilterInput} from "@/Components/FilterInput.tsx";
 import ImageResults2D from "@/Components/ImageResults2D.tsx";
 
 type ZeroShotClassificationQueryProps = {
-
+    setSelectedImages: (images: Image[]) => void;
 }
 
 type ZeroShotClassification = {
@@ -108,7 +108,7 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         {/*<!--<ImageResultsGrid images={images} onSelect={handleSelect}/>-->*/}
         <pre>{JSON.stringify(queryInput?.classes)}</pre>
         {queryInput && (queryResults.length > 0) && <>
-            {/*<MultiColumn columns={resultClasses.length} >
+            <MultiColumn columns={resultClasses.length} >
                     {resultClasses.map((cls_id) => {
                         const thisClsResults = queryResults.filter((qr) => qr.best_cls === cls_id);
                         //return <div>{JSON.stringify(thisClsResults)}</div>
@@ -119,9 +119,10 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
                         <ImageResultsGrid images={thisClsImages} onSelect={() => {}} />
                         </>
                     })}
-                </MultiColumn>*/}
-                <ImageResults2D images={queryResults.map((qr) => qr.image)}
+                </MultiColumn>
+            {/*<ImageResults2D images={queryResults.map((qr) => qr.image)}
                                 positions={queryResults.map((qr) => qr.order_key as number[])} />
+                                */}
             </>
         }
 

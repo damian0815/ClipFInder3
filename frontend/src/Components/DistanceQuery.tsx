@@ -8,7 +8,7 @@ import {FilterInput} from "@/Components/FilterInput.tsx";
 
 
 type DistanceQueryProps = {
-
+    setSelectedImages: (images: Image[]) => void;
 }
 
 
@@ -17,13 +17,6 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [embeddingInput, setEmbeddingInput] = useState<EmbeddingInputData|undefined>(undefined)
     const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
     const [images, setImages] = useState<Image[]>([]);
-    const [selectedImages, setSelectedImages] = useState([]);
-
-    const handleSelect = (images) => {
-        setSelectedImages(images);
-        console.log("Selected Images:", images);
-    };
-
 
     useEffect(() => {
         if (embeddingInput) {
@@ -38,7 +31,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     return <>
         <EmbeddingInputs id='distance_query' setEmbeddingInput={setEmbeddingInput} />
         <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
-        <ImageResultsGrid images={images} onSelect={handleSelect}/>
+        <ImageResultsGrid images={images} onSelect={props.setSelectedImages}/>
     </>
 
 

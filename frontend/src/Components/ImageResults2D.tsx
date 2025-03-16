@@ -19,7 +19,7 @@ type ImageResults2DProps = {
 function ImageResults2D(props: ImageResults2DProps) {
 
     return <div className="image-2d relative w-full aspect-square border border-gray-400">
-        <TransformWrapper>
+        <TransformWrapper initialScale={0.5}>
             <TransformComponent
                 wrapperStyle={{width: "100%", height: "100%"}}
                 contentStyle={{width: "100%", height: "100%"}}
@@ -47,19 +47,16 @@ function ImageResults2DImages(props: ImageResults2DProps) {
                     style={{
                         left: `${props.positions[index][0] * 100}%`,
                         top: `${props.positions[index][1] * 100}%`
-                        /*width: `${100 / imageScale}px`,
-                        height: `${100 / imageScale}px`*/
                     }}
         >
-                        <KeepScale >
-
-            <ResultImage
-                image={img}
-                isSelected={false}
-                onClick={(_) => {
-                }}
-            />
-                </KeepScale>
+            <KeepScale >
+                <ResultImage
+                    image={img}
+                    isSelected={false}
+                    onClick={(_) => {
+                    }}
+                />
+            </KeepScale>
         </div>
     )
 }
