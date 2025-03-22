@@ -23,7 +23,7 @@
   }
 
   .image-2d img:hover {
-    z-index:555555;
+    /*z-index:555555;*/
     background: blue;
     border: 1px solid crimson;
   }
@@ -46,6 +46,19 @@
 
 .main-content.with-sidebar {
   margin-right: 250px;
+}
+
+.status-bar {
+  position: fixed;
+  bottom: 0px;
+  height: 45px;
+  background-color: #f5f5f5;
+  border-top: 1px solid #ddd;
+  z-index: 1000;
+}
+
+.filenames-list {
+  white-space: nowrap;
 }
 
 .sidebar {
@@ -79,4 +92,11 @@
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+}
+
+.tagpill {
+  display: inline-block;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 0.1em 0.3em 0.1em 0.3em;
 }

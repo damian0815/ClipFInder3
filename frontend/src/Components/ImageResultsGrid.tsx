@@ -10,6 +10,7 @@ type ImageResultsGridProps = {
 function ImageResultsGrid(props: ImageResultsGridProps) {
     const [selectedImages, setSelectedImages] = useState<Array<Image>>([]);
     const [mode, setMode] = useState<'add' | 'remove' | 'replace' | 'reverse'>('replace');
+    const [mouseIsOver, setMouseIsOver] = useState<boolean>(false);
 
     const handleImageClick = (img: Image) => {
         switch (mode) {
@@ -50,9 +51,14 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     }, []);
 
     return (
-        <div className="image-grid">
+        <div className={"image-grid border-1 p-4"}
+             onMouseEnter={(e) => setMouseIsOver(true)}
+             onMouseLeave={(e) => setMouseIsOver(false)}
+        >
+
             <Selectable
-                mode={(mode == 'replace' ? 'add' : mode)}
+                disabled={!mouseIsOver}
+                mode={mode === 'replace' ? 'reverse' : mode}
                 value={selectedImages}
                 onEnd={(newSelectedImages, { added, removed }) => {
                     switch (mode) {
@@ -75,6 +81,7 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
                         onClick={handleImageClick}
                     />
                 ))}
+
             </Selectable>
 
         </div>

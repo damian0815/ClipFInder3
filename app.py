@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import os
+
+from tags_wrangler import TagsWrangler
+
 print("imported fastapi")
 
 from backend.clip_embedding_store import Query
@@ -40,6 +43,8 @@ embedding_store = SimpleClipEmbeddingStore(load_model=load_mobile_clip_model,
 print("making thumbnail provider")
 
 thumbnail_provider = ThumbnailProvider()
+tags_wrangler = TagsWrangler()
+
 print("making FastAPI")
 
 app = FastAPI()
@@ -55,12 +60,13 @@ app.add_middleware(
 
 
 @app.get("/api/search")
-async def search_images(q: str = ""):
+async def search_images(q: str = "", pathContains: str = None):
     print(f'searching - "{q}"')
-    query = Query.text_query(q)
+    query = Query.text_query(q, path_contains=pathContains)
     results = embedding_store.search_images(query=query)
-    return [ImageResponse(id=r.id, path=r.path, distance=r.distance, tags=[])
+    return [ImageResponse(id=r.id, path=r.path, distance=r.distance)
             for r in results]
+
 
 
 @app.get("/api/image/{id}")
@@ -95,6 +101,64 @@ async def populate_database(request: PopulateRequest):
     num_images_added = embedding_store.add_images_recursively(request.image_dir)
     logger.info(f"populating done returned")
     return {'message': f'added {num_images_added} images to embedding store'}
+
+
+class AddTagRequest(BaseModel):
+    image_ids: list[str]
+    tag_to_add: str
+
+
+@app.post("/api/addTag")
+async def add_tag(request: AddTagRequest):
+    image_paths = [embedding_store.get_image_path(id) for id in request.image_ids]
+
+    errors = []
+    for image_path in image_paths:
+        try:
+            tags_wrangler.add_tag(image_path, request.tag_to_add)
+        except Exception as e:
+            errors.append(e)
+    return {
+        'images_tags': _build_images_tags(request.image_ids),
+        'errors': [str(e) for e in errors],
+        'message': f'added {request.tag_to_add}' + (f' ({len(errors)} errors)' if errors else '')}
+
+
+class DeleteTagRequest(BaseModel):
+    image_ids: list[str]
+    tag_to_delete: str
+
+
+@app.post("/api/deleteTag")
+async def delete_tag(request: DeleteTagRequest):
+    image_paths = [embedding_store.get_image_path(id) for id in request.image_ids]
+    errors = []
+    for image_path in image_paths:
+        try:
+            tags_wrangler.remove_tag(image_path, request.tag_to_delete)
+        except Exception as e:
+            errors.append(e)
+    return {
+        'images_tags': _build_images_tags(request.image_ids),
+        'errors': errors,
+        'message': f'deleted {request.tag_to_delete}' + (f' ({len(errors)} errors)' if errors else '')}
+
+
+@app.get("/api/tags/{id}")
+async def serve_tags(id: str):
+    logging.info(f"fetching tags for {id}")
+    file_path = embedding_store.get_image_path(id)
+    return {
+        'image': id,
+        'tags': tags_wrangler.get_tags(file_path)
+    }
+
+
+def _build_images_tags(image_ids: list[str]) -> dict[str, list[str]]:
+    return [
+        {'id': image_id, 'tags': tags_wrangler.get_tags(embedding_store.get_image_path(image_id))}
+        for image_id in image_ids
+    ]
 
 
 @app.get("/api/thumbnail/{id}")

@@ -49,6 +49,8 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
     const [filterInput, setFilterInput] = useState<FilterInputData>(getLastFilter())
     const [queryInProgress, setQueryInProgress] = useState<boolean>(false)
 
+    const [selectedImagesPerClass, setSelectedImagesPerClass] = useState<Record<string, Image[]>>({})
+
     //console.log("queryResults", getZeroShotResults())
 
     useEffect(() => {
@@ -98,6 +100,13 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         resultClasses.sort()
     }
 
+    function selectedImagesUpdated(clsId: string, images: Image[]) {
+        selectedImagesPerClass[clsId] = images;
+        const allSelectedImages = Object.values(selectedImagesPerClass).flatMap((si) => si);
+        props.setSelectedImages(allSelectedImages);
+        console.log("all selected images:", allSelectedImages);
+    }
+
     return <>
         <ZeroShotClassificationInput initialQuery={getLastQuery()} setQuery={setQueryInput}/>
         <FilterInput initialFilterInput={getLastFilter()} setFilterInput={setFilterInput} />
@@ -109,14 +118,14 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         <pre>{JSON.stringify(queryInput?.classes)}</pre>
         {queryInput && (queryResults.length > 0) && <>
             <MultiColumn columns={resultClasses.length} >
-                    {resultClasses.map((cls_id) => {
-                        const thisClsResults = queryResults.filter((qr) => qr.best_cls === cls_id);
+                    {resultClasses.map((clsId) => {
+                        const thisClsResults = queryResults.filter((qr) => qr.best_cls === clsId);
                         //return <div>{JSON.stringify(thisClsResults)}</div>
                         thisClsResults.sort((a, b) => a.entropy - b.entropy);
                         const thisClsImages = thisClsResults.map((qr) => qr.image)
                         return <>
-                         <pre>{cls_id}</pre>
-                        <ImageResultsGrid images={thisClsImages} onSelect={() => {}} />
+                         <pre>{clsId}</pre>
+                        <ImageResultsGrid images={thisClsImages} onSelect={(si) => selectedImagesUpdated(clsId, si)} />
                         </>
                     })}
                 </MultiColumn>

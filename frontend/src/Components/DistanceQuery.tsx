@@ -23,7 +23,10 @@ function DistanceQuery(props: DistanceQueryProps) {
             const query = embeddingInput.texts[0]
             fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`)
                 .then(res => res.json())
-                .then(data => setImages(data));
+                .then(data => {
+                    console.log(data);
+                    setImages(data)
+                });
         }
     }, [embeddingInput]);
 

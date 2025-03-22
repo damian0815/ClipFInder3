@@ -11,10 +11,11 @@ from PIL import Image
 class Query:
     texts: List[str]
     images: List[str]
+    path_contains: str
 
     @staticmethod
-    def text_query(text: str):
-        return Query(texts=[text], images=[])
+    def text_query(text: str, path_contains: str):
+        return Query(texts=[text], images=[], path_contains=path_contains)
 
 
 @dataclass

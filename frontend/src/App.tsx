@@ -1,5 +1,5 @@
 import './App.css';
-import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
+import {Tab, TabList, TabPanel, Tabs} from 'react-tabs';
 import 'react-tabs/style/react-tabs.css';
 import './Style/Collapsible.css'
 
@@ -9,6 +9,7 @@ import DistanceQuery from "@/Components/DistanceQuery.tsx";
 import ZeroShotClassificationQuery from "@/Components/ZeroShotClassificationQuery.tsx";
 import Image from "@/Components/Image.tsx";
 import {useState} from "react";
+import {TagEditorSidebar} from "@/Components/TagEditorSidebar.tsx";
 
 function App() {
 
@@ -19,18 +20,58 @@ function App() {
         setSidebarOpen(!sidebarOpen);
     };
 
-  return (
-      <div className="App">
-          <div className={`main-content ${sidebarOpen ? 'with-sidebar' : ''}`}>
-              <h1>Image Search</h1>
-              <Collapsible trigger={"Populate"}>
-                  <PopulateDatabase/>
-              </Collapsible>
-              <Collapsible trigger={"Tag filters"}>
-                  <p>Tag filters go here</p>
-              </Collapsible>
+    function addTag(images: Image[], tagToAdd: string) {
 
-              <Tabs>
+    }
+
+    function deleteTag(images: Image[], tagToDelete: string) {
+
+    }
+
+    function longestCommonPrefix(strs: string[]) {
+      if (strs.length === 0) {
+        return "";
+      }
+      let prefix = strs[0];
+      for (let i = 1; i < strs.length; i++) {
+        while (strs[i].indexOf(prefix) !== 0) {
+          prefix = prefix.substring(0, prefix.length - 1);
+          if (prefix === "") {
+            return "";
+          }
+        }
+      }
+      return prefix;
+    }
+
+    function wrangleCommonPaths(images: Image[]) {
+        const allPaths = images.map((i) => i.path);
+        let commonRoot = longestCommonPrefix(allPaths);
+        console.log('commonRoot is ', commonRoot, 'of allPaths', allPaths)
+        const lastSlash = commonRoot.lastIndexOf("/");
+        if (lastSlash == 0) {
+            commonRoot = "/"
+        } else if (lastSlash != -1) {
+            commonRoot = commonRoot.substring(0, lastSlash);
+        }
+        return <div className={"common-paths"}>
+            <div className={"filenames-list text-sm"}>{allPaths.map((p) => p.substring(commonRoot.length + 1)).join(", ")}</div>
+            <div className={"text-xs"}>{allPaths.length} files selected in {commonRoot}</div>
+        </div>
+    }
+
+    return (
+        <div className="App">
+            <div className={`main-content ${sidebarOpen ? 'with-sidebar' : ''}`}>
+                <h1>Image Search</h1>
+                <Collapsible trigger={"Populate"}>
+                    <PopulateDatabase/>
+                </Collapsible>
+                <Collapsible trigger={"Tag filters"}>
+                    <p>Tag filters go here</p>
+                </Collapsible>
+
+                <Tabs>
                   <TabList>
                       <Tab>Distance</Tab>
                       <Tab>Zero-Shot Classification</Tab>
@@ -40,8 +81,7 @@ function App() {
                       <DistanceQuery setSelectedImages={setSelectedImages}/>
                   </TabPanel>
                   <TabPanel>
-                      <ZeroShotClassificationQuery setSelectedImages={setSelectedImages}
-                                                   />
+                      <ZeroShotClassificationQuery setSelectedImages={setSelectedImages}/>
                   </TabPanel>
               </Tabs>
           </div>
@@ -50,23 +90,16 @@ function App() {
               <div className="sidebar-toggle" onClick={toggleSidebar}>
                   {sidebarOpen ? '›' : '‹'}
               </div>
-              <div className="sidebar-content">
-                  <h2>Selected Images</h2>
-                  {selectedImages.map((image, index) => (image.id))}
-                  {selectedImages.length === 0 ? (
-                      <p>No images selected</p>
-                  ) : (
-                      <ul className="selected-images-list">
-                          {selectedImages.map((image, index) => (
-                              <li key={index}>
-                                  {image.path}
-                              </li>
-                          ))}
-                      </ul>
-                  )}
-              </div>
+                <TagEditorSidebar
+                    images={selectedImages}
+                    requestDeleteTag={deleteTag}
+                    requestAddTag={addTag}
+                />
           </div>
 
+            <div className={"status-bar"}>
+                {selectedImages.length > 0 && wrangleCommonPaths(selectedImages)}
+            </div>
 
       </div>
   );

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from backend.util import get_tags
 
 from pydantic import BaseModel
 from pydantic.alias_generators import to_camel
@@ -43,8 +44,16 @@ class ZeroShotClassifyRequest(BaseModel):
 class ImageResponse:
     id: str
     path: str
-    distance: float|None = None
-    tags: list[str]|None = None
+    distance: float
+    tags: list[str]
+
+    def __init__(self, id, path, distance=None, tags=None):
+        self.id = id
+        self.path = path
+        self.distance = distance or 0
+        self.tags = tags or get_tags(path)
+        if self.tags:
+            print('tags:', self.tags, 'path:', path)
 
 
 @dataclass

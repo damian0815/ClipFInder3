@@ -72,14 +72,31 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             for i in query.images
         ]
 
-        similarities = [torch.cosine_similarity(self.image_embeddings, q)
+        image_paths, image_ids, image_embeddings = self._filter_images_by_path(query.path_contains)
+
+        similarities = [torch.cosine_similarity(image_embeddings, q)
                         for q in query_embeddings]
         summed_similarities = torch.stack(similarities).sum(dim=0)
         _, ordered_indices = torch.sort(summed_similarities, descending=True)
         return [QueryResult(distance=summed_similarities[i],
-                            path=self.image_paths[i],
-                            id=self.image_ids[i])
+                            path=image_paths[i],
+                            id=image_ids[i])
                 for i in ordered_indices[:limit]]
+
+    def _filter_images_by_path(self, path_contains: str = None) -> tuple[list[str], list[str], torch.Tensor]:
+        path_contains = path_contains.lower()
+        if path_contains:
+            indices = [i for i, path in enumerate(self.image_paths) if path_contains in path.lower()]
+            image_paths = [self.image_paths[i] for i in indices]
+            image_ids = [self.image_ids[i] for i in indices]
+            image_embeddings = self.image_embeddings[torch.tensor(indices)]
+        else:
+            image_paths = self.image_paths
+            image_ids = self.image_ids
+            image_embeddings = self.image_embeddings
+        return image_paths, image_ids, image_embeddings
+
+
 
     def add_images(self, paths: list[str]) -> torch.Tensor:
         paths = [p for p in paths if not self.has_image(p)]

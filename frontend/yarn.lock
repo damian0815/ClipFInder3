@@ -1848,6 +1848,11 @@ collection-visit@^1.0.0:
     map-visit "^1.0.0"
     object-visit "^1.0.0"
 
+common-path@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/common-path/-/common-path-1.0.1.tgz#308d00ed897b1ef58029c720d48d56cf1277d0f7"
+  integrity sha512-C8zvr4tVGRIJpbrh7WxeFZPvUkc2PHWx2IvxAUtuJCAiOLx0n6N4Xaab0C7wM+HDfXLqUQg7H9FoIjyxn/4IiA==
+
 commondir@^1.0.1:
   version "1.0.1"
   resolved "https://registry.npmjs.org/commondir/-/commondir-1.0.1.tgz"
