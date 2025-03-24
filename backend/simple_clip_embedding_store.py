@@ -182,8 +182,11 @@ def _repair_image_paths_case(paths: list[str]) -> list[str]:
             parent_contents[parent] = os.listdir(case_correct_parent)
 
         filename = os.path.basename(path).lower()
-        case_correct_filename = next(fn for fn in parent_contents[parent]
+        try:
+            case_correct_filename = next(fn for fn in parent_contents[parent]
                                      if fn.lower() == filename)
-        return os.path.join(case_correct_parent, case_correct_filename)
+            return os.path.join(case_correct_parent, case_correct_filename)
+        except StopIteration:
+            return None
 
     return [get_case_correct_path(p) for p in paths]
