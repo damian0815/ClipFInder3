@@ -1,15 +1,17 @@
 import os
 import uuid
 from collections.abc import Callable
+from typing import Awaitable, Any
 
 import torch
 
-from backend.clip_embedding_store import EmbeddingStore, Query, QueryResult
+from backend.embedding_store import EmbeddingStore, Query, QueryResult
 from backend.clip_model import ClipModel
+from backend.progress_websocket.progress_broadcaster import ProgressBroadcaster, ProgressAccumulator
 
 
 class SimpleClipEmbeddingStore(EmbeddingStore):
-    def __init__(self, load_model: Callable[[], ClipModel],
+    def __init__(self, load_model: Callable[[], Awaitable[ClipModel]],
                  embedding_dim=512,
                  store_file: str = None,
                  repair_store_file_case: bool=False):
@@ -29,10 +31,9 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             self.image_paths = []
             self.image_ids = []
 
-    @property
-    def clip_model(self) -> ClipModel:
+    async def get_clip_model(self) -> ClipModel:
         if self._clip_model is None:
-            self._clip_model = self.load_model()
+            self._clip_model = await self.load_model()
         return self._clip_model
 
     @property
@@ -47,45 +48,52 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
     def all_image_paths(self) -> list[str]:
         return self.image_paths
 
-    def get_image_embedding(self, path: str) -> torch.Tensor:
+    async def get_image_embedding(self, path: str) -> torch.Tensor:
         try:
             index = self.image_paths.index(path)
             return self.image_embeddings[index]
         except ValueError:
-            image_embedding = self.add_image(path)
+            image_embedding = await self.add_image(path)
             return image_embedding
 
-    def get_text_embedding(self, text: str) -> torch.Tensor:
+    async def get_text_embedding(self, text: str) -> torch.Tensor:
         try:
             index = self.texts.index(text.lower())
             return self.text_embeddings[index]
         except ValueError:
-            text_embedding = self.add_text(text)
+            text_embedding = await self.add_text(text)
             return text_embedding
 
-    def search_images(self, query: Query, limit=100) -> list[QueryResult]:
+    async def search_images(self, query: Query, limit=100) -> list[QueryResult]:
+
+        progress_accumulator = ProgressBroadcaster.instance().make_helper(
+            total=2*(len(query.texts) + len(query.images)) + 1,
+            label='search'
+        )
+
         query_embeddings = [
-            self.get_text_embedding(t)
-            for t in query.texts
+            await progress_accumulator.update() or await self.get_text_embedding(t)
+            for i, t in enumerate(query.texts)
         ] + [
-            self.get_image_embedding(i)
-            for i in query.images
+            await progress_accumulator.update() or await self.get_image_embedding(i)
+            for i, t in enumerate(query.images)
         ]
 
-        image_paths, image_ids, image_embeddings = self._filter_images_by_path(query.path_contains)
+        image_paths, image_ids, image_embeddings = self._filter_images_by_path_maybe(query.path_contains)
 
-        similarities = [torch.cosine_similarity(image_embeddings, q)
+        similarities = [await progress_accumulator.update() or torch.cosine_similarity(image_embeddings, q)
                         for q in query_embeddings]
         summed_similarities = torch.stack(similarities).sum(dim=0)
         _, ordered_indices = torch.sort(summed_similarities, descending=True)
+        await progress_accumulator.finish()
         return [QueryResult(distance=summed_similarities[i],
                             path=image_paths[i],
                             id=image_ids[i])
                 for i in ordered_indices[:limit]]
 
-    def _filter_images_by_path(self, path_contains: str = None) -> tuple[list[str], list[str], torch.Tensor]:
-        path_contains = path_contains.lower()
+    def _filter_images_by_path_maybe(self, path_contains: str = None) -> tuple[list[str], list[str], torch.Tensor]:
         if path_contains:
+            path_contains = path_contains.lower()
             indices = [i for i, path in enumerate(self.image_paths) if path_contains in path.lower()]
             image_paths = [self.image_paths[i] for i in indices]
             image_ids = [self.image_ids[i] for i in indices]
@@ -97,22 +105,32 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         return image_paths, image_ids, image_embeddings
 
 
-
-    def add_images(self, paths: list[str]) -> torch.Tensor:
+    async def add_images(self, paths: list[str]) -> torch.Tensor:
         paths = [p for p in paths if not self.has_image(p)]
-        embeddings_to_add = list(self.clip_model.get_image_features_batched(paths, batch_size=8))
+        if len(paths) == 0:
+            return torch.empty([0, self.embedding_dim])
+        clip_model = await self.get_clip_model()
+        progress_accumulator = ProgressBroadcaster.instance().make_helper(
+            total=len(paths) + 1,
+            label="add images")
+        embeddings_to_add = list([await progress_accumulator.update() or f
+                                  async for f in clip_model.get_image_features_batched(
+            paths, batch_size=8)
+        ])
         assert len(embeddings_to_add) == len(paths)
         self.image_embeddings = torch.cat([self.image_embeddings, torch.stack(embeddings_to_add)])
         self.image_ids = self.image_ids + [str(uuid.uuid4()) for _ in range(len(paths))]
         self.image_paths.extend(paths)
         self._save_to_store()
+        await progress_accumulator.finish()
         return embeddings_to_add
 
-    def add_image(self, path) -> torch.Tensor:
-        return self.add_images([path])[0]
+    async def add_image(self, path) -> torch.Tensor:
+        return (await self.add_images([path]))[0]
 
-    def add_text(self, text: str) -> torch.Tensor:
-        embedding_to_add = self.clip_model.get_text_features(text.lower())
+    async def add_text(self, text: str) -> torch.Tensor:
+        clip_model = await self.get_clip_model()
+        embedding_to_add = await clip_model.get_text_features(text.lower())
         self.text_embeddings = torch.cat([self.text_embeddings, embedding_to_add.unsqueeze(dim=0)])
         self.texts.append(text)
         self._save_to_store()

@@ -1,5 +1,5 @@
 import logging
-from typing import List, Generator
+from typing import List, Generator, Awaitable
 
 import torch
 from PIL import Image
@@ -9,6 +9,8 @@ from mobileclip.modules.common.mobileone import reparameterize_model
 from backend.clip_model import ClipModel
 from PIL import ImageOps
 from tqdm.auto import tqdm
+
+from backend.progress_websocket.progress_broadcaster import ProgressBroadcaster
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +26,14 @@ class MobileClipModel(ClipModel):
     def embedding_dim(self):
         return 512
 
-    def load_model(self):
+    async def load_model(self, progress_label: str = 'Loading CLIP model'):
         """Load the MobileCLIP model weights and prepare for inference."""
+        await ProgressBroadcaster.instance().send_progress(progress_label, 0)
         logger.info("loading MobileCLIP-S2...")
         model, _, preprocess = open_clip.create_model_and_transforms('MobileCLIP-S2', pretrained='datacompdr')
         tokenizer = open_clip.get_tokenizer('MobileCLIP-S2')
         logger.info("loaded.")
+        await ProgressBroadcaster.instance().send_progress(progress_label, 0.99)
 
         # For inference/model exporting purposes, please reparameterize first
         model.eval() 
@@ -37,17 +41,21 @@ class MobileClipModel(ClipModel):
         self.model = model
         self.preprocess = preprocess
         self.tokenizer = tokenizer
+        await ProgressBroadcaster.instance().send_progress(progress_label, 0.99)
+
         return self
 
-    def get_image_features(self, image: str) -> torch.Tensor:
+    async def get_image_features(self, image: str) -> torch.Tensor:
         return self.get_image_features_batched([image])
 
-    def get_image_features_batched(self, images: List[str], batch_size: int=8) -> Generator[torch.Tensor, None, None]:
+    async def get_image_features_batched(self, images: List[str], batch_size: int = 8
+                                   ) -> Generator[torch.Tensor, None, None]:
+
         if self.model is None:
-            self.load_model()
+            await self.load_model()
         image_chunks = [images[i:i+batch_size]
                         for i in range(0, len(images), batch_size)]
-        for chunk in tqdm(image_chunks):
+        for chunk_index, chunk in enumerate(tqdm(image_chunks)):
             def load_images(chunk) -> Generator[Image, None, None]:
                 for path in chunk:
                     try:
@@ -66,7 +74,7 @@ class MobileClipModel(ClipModel):
                     yield image_features[i]
 
 
-    def get_text_features(self, text: str) -> torch.Tensor:
+    async def get_text_features(self, text: str) -> torch.Tensor:
         """Extract feature vector from text using MobileCLIP.
         
         Args:
@@ -76,7 +84,7 @@ class MobileClipModel(ClipModel):
             List of floats representing the text embedding
         """
         if self.model is None:
-            self.load_model()
+            await self.load_model()
         text = self.tokenizer([text])
         with torch.no_grad(), torch.cuda.amp.autocast():
             text_features = self.model.encode_text(text, normalize=True)

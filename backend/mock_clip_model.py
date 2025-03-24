@@ -3,6 +3,7 @@ from typing import List, Generator
 import torch
 
 from backend.clip_model import ClipModel
+from backend.progress_websocket.progress_broadcaster import ProgressBroadcaster
 
 
 class MockClipModel(ClipModel):
@@ -17,9 +18,10 @@ class MockClipModel(ClipModel):
     def get_text_features(self, text: str) -> torch.Tensor:
         return self._get_mock_features()
 
-    def get_image_features(self, image: str) -> torch.Tensor:
+    async def get_image_features(self, image: str) -> torch.Tensor:
         return self._get_mock_features()
 
-    def get_image_features_batched(self, images: List[str], batch_size: int = 8) -> Generator[torch.Tensor, None, None]:
+    async def get_image_features_batched(self, images: List[str], batch_size: int = 8
+                                   ) -> Generator[torch.Tensor, None, None]:
         for i in range(0, len(images), batch_size):
             yield [self._get_mock_features() for _ in range(batch_size)]

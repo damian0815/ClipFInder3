@@ -8,7 +8,6 @@ import MultiColumn from "@/Components/MultiColumn.tsx";
 import Image from "@/Components/Image.tsx";
 import {FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import {FilterInput} from "@/Components/FilterInput.tsx";
-import ImageResults2D from "@/Components/ImageResults2D.tsx";
 
 type ZeroShotClassificationQueryProps = {
     setSelectedImages: (images: Image[]) => void;

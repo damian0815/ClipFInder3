@@ -1,23 +1,26 @@
 # Backend (app.py)
+import asyncio
 import logging
-from typing import List
+from fastapi import FastAPI, HTTPException, WebSocket
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import os
 
+from starlette.websockets import WebSocketDisconnect
+
+from backend.progress_websocket.progress_broadcaster import ProgressBroadcaster
 from tags_wrangler import TagsWrangler
 
 print("imported fastapi")
 
-from backend.clip_embedding_store import Query
-print("imported backend.clip_embedding_store.Query")
+from backend.embedding_store import Query
+print("imported backend.embedding_store.Query")
 from backend.simple_clip_embedding_store import SimpleClipEmbeddingStore
 print("imported backend.simple_clip_embedding_store.SimpleClipEmbeddingStore")
 from backend.thumbnail_provider import ThumbnailProvider
-
-from fastapi import FastAPI, HTTPException
+from pycentraldispatch import PyCentralDispatch
 
 from backend.types import ZeroShotClassifyRequest, ImageResponse
 from backend.zero_shot import do_zero_shot_classify
@@ -29,9 +32,12 @@ logger = logging.getLogger(__name__)
 
 print("making embedding store")
 
-def load_mobile_clip_model():
-    from backend.mobile_clip_model import MobileClipModel
-    return MobileClipModel().load_model()
+async def load_mobile_clip_model():
+    progress_label = 'Loading CLIP model'
+    await ProgressBroadcaster.instance().send_progress(progress_label, 0)
+    if True:
+        from backend.mobile_clip_model import MobileClipModel
+        return await MobileClipModel().load_model(progress_label=progress_label)
 
 def load_mock_model():
     from backend.mock_clip_model import MockClipModel
@@ -44,6 +50,7 @@ print("making thumbnail provider")
 
 thumbnail_provider = ThumbnailProvider()
 tags_wrangler = TagsWrangler()
+progress_broadcaster = ProgressBroadcaster()
 
 print("making FastAPI")
 
@@ -62,8 +69,9 @@ app.add_middleware(
 @app.get("/api/search")
 async def search_images(q: str = "", pathContains: str = None):
     print(f'searching - "{q}"')
+    await progress_broadcaster.send_progress('search', 0)
     query = Query.text_query(q, path_contains=pathContains)
-    results = embedding_store.search_images(query=query)
+    results = await embedding_store.search_images(query=query)
     return [ImageResponse(id=r.id, path=r.path, distance=r.distance)
             for r in results]
 
@@ -98,8 +106,11 @@ async def populate_database(request: PopulateRequest):
             detail=f"Directory '{request.image_dir}' does not exist"
         )
     logger.info(f"populating database from directory {request.image_dir}")
-    num_images_added = embedding_store.add_images_recursively(request.image_dir)
-    logger.info(f"populating done returned")
+    num_images_added = await embedding_store.add_images_recursively(
+        request.image_dir
+    )
+
+    logger.info(f"populating database done")
     return {'message': f'added {num_images_added} images to embedding store'}
 
 
@@ -169,6 +180,46 @@ async def serve_thumbnail(id: str):
 
     thumbnail_path = thumbnail_provider.get_or_create_thumbnail(original_path)
     return FileResponse(thumbnail_path)
+
+
+@app.get("/api/testwebsockets")
+async def test_websockets():
+    for c in range(100):
+        await ProgressBroadcaster.instance().send_progress("testwebsockets", c/100)
+        await asyncio.sleep(0.2)
+
+
+#@app.on_event("startup")
+#async def startup_event():
+#    # This spawns a background task that won't block the server
+#    await asyncio.create_task(progress_broadcaster.run_broadcast_queue_loop())
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    logging.info("websocket endpoint hit")
+    await progress_broadcaster.connect(websocket)
+    try:
+        # Keep connection open and wait for disconnect
+        while True:
+            logging.info("ws endpoint awaiting receive")
+            # Optional: implement timeout for stale connections
+            try:
+                # Short timeout t   o check connection health periodically
+                received_text = await asyncio.wait_for(websocket.receive_text(), timeout=30)
+                print(f"ws endpoint {websocket} received '{received_text.strip()}'")
+                await asyncio.wait_for(websocket.send_text(f"hi you sent '{received_text.strip()}'"), timeout=30)
+            except asyncio.TimeoutError:
+                # Optional: send ping to verify connection
+                await websocket.send_json({"type": "ping"})
+                continue
+    except WebSocketDisconnect:
+        logging.info(f"ws endpoint {websocket} disconnect")
+        progress_broadcaster.disconnect(websocket)
+    finally:
+        # Ensure cleanup happens
+        logging.info(f"ws endpoint {websocket} finally (done)")
+        if websocket in progress_broadcaster.active_connections:
+            progress_broadcaster.disconnect(websocket)
 
 
 if __name__ == '__main__':

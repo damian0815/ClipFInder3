@@ -19,15 +19,17 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [images, setImages] = useState<Image[]>([]);
 
     useEffect(() => {
-        if (embeddingInput) {
-            const query = embeddingInput.texts[0]
-            fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`)
-                .then(res => res.json())
-                .then(data => {
-                    console.log(data);
-                    setImages(data)
-                });
-        }
+        (async () => {
+            if (embeddingInput) {
+                const query = embeddingInput.texts[0]
+                fetch(`${API_BASE_URL}/api/search?q=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        console.log(data);
+                        setImages(data)
+                    });
+            }
+        })()
     }, [embeddingInput]);
 
 

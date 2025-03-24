@@ -10,6 +10,8 @@ import ZeroShotClassificationQuery from "@/Components/ZeroShotClassificationQuer
 import Image from "@/Components/Image.tsx";
 import {useState} from "react";
 import {TagEditorSidebar} from "@/Components/TagEditorSidebar.tsx";
+import WebSocketProgressBar from '@/Components/WebSocketProgressBar';
+import {longestCommonPrefix} from "@/Utils.tsx";
 
 function App() {
 
@@ -19,30 +21,6 @@ function App() {
     const toggleSidebar = () => {
         setSidebarOpen(!sidebarOpen);
     };
-
-    function addTag(images: Image[], tagToAdd: string) {
-
-    }
-
-    function deleteTag(images: Image[], tagToDelete: string) {
-
-    }
-
-    function longestCommonPrefix(strs: string[]) {
-      if (strs.length === 0) {
-        return "";
-      }
-      let prefix = strs[0];
-      for (let i = 1; i < strs.length; i++) {
-        while (strs[i].indexOf(prefix) !== 0) {
-          prefix = prefix.substring(0, prefix.length - 1);
-          if (prefix === "") {
-            return "";
-          }
-        }
-      }
-      return prefix;
-    }
 
     function wrangleCommonPaths(images: Image[]) {
         const allPaths = images.map((i) => i.path);
@@ -62,7 +40,9 @@ function App() {
 
     return (
         <div className="App">
-            <div className={`main-content ${sidebarOpen ? 'with-sidebar' : ''}`}>
+            <WebSocketProgressBar />
+
+             <div className={`main-content ${sidebarOpen ? 'with-sidebar' : ''}`}>
                 <h1>Image Search</h1>
                 <Collapsible trigger={"Populate"}>
                     <PopulateDatabase/>
@@ -92,8 +72,6 @@ function App() {
               </div>
                 <TagEditorSidebar
                     images={selectedImages}
-                    requestDeleteTag={deleteTag}
-                    requestAddTag={addTag}
                 />
           </div>
 

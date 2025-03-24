@@ -26,8 +26,6 @@ function Tag(props: TagProps) {
 
 type TagEditorSidebarProps = {
     images: Image[]
-    requestAddTag: (images: Image[], tagToAdd: string) => void;
-    requestDeleteTag: (images: Image[], tagToDelete: string) => void;
 
 }
 
@@ -53,8 +51,7 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
     async function updateTags() {
 
         await Promise.all(props.images.map(async (i) => {
-            const tags = await getTags(i.id)
-            i.tags = tags
+            i.tags = await getTags(i.id)
         }));
         const allTags = props.images.flatMap((i) => (i.tags ?? []))
         setTags(new Set(allTags));

@@ -1,5 +1,5 @@
 import torch
-from backend.clip_embedding_store import EmbeddingStore
+from backend.embedding_store import EmbeddingStore
 from backend.types import ZeroShotClassifyRequest, ZeroShotClassification, ImageResponse
 from MulticoreTSNE import MulticoreTSNE as TSNE
 import logging

@@ -9,6 +9,7 @@ Pillow>=10.0.0
 platformdirs>=3.0.0
 osxmetadata
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
 MulticoreTSNE
+pycentraldispatch
