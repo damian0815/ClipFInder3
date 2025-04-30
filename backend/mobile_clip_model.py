@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import List, Generator, Awaitable
 
@@ -26,14 +27,14 @@ class MobileClipModel(ClipModel):
     def embedding_dim(self):
         return 512
 
-    async def load_model(self, progress_label: str = 'Loading CLIP model'):
+    def load_model(self, progress_label: str = 'Loading CLIP model'):
         """Load the MobileCLIP model weights and prepare for inference."""
-        await ProgressBroadcaster.instance().send_progress(progress_label, 0)
         logger.info("loading MobileCLIP-S2...")
         model, _, preprocess = open_clip.create_model_and_transforms('MobileCLIP-S2', pretrained='datacompdr')
+        ProgressBroadcaster.instance().send_progress(progress_label, 0.98)
         tokenizer = open_clip.get_tokenizer('MobileCLIP-S2')
         logger.info("loaded.")
-        await ProgressBroadcaster.instance().send_progress(progress_label, 0.99)
+        ProgressBroadcaster.instance().send_progress(progress_label, 0.99)
 
         # For inference/model exporting purposes, please reparameterize first
         model.eval() 
@@ -41,7 +42,7 @@ class MobileClipModel(ClipModel):
         self.model = model
         self.preprocess = preprocess
         self.tokenizer = tokenizer
-        await ProgressBroadcaster.instance().send_progress(progress_label, 0.99)
+        ProgressBroadcaster.instance().send_progress(progress_label, 1)
 
         return self
 

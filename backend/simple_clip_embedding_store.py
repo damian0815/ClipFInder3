@@ -1,5 +1,6 @@
 import os
 import uuid
+from asyncio import Lock
 from collections.abc import Callable
 from typing import Awaitable, Any
 
@@ -8,6 +9,7 @@ import torch
 from backend.embedding_store import EmbeddingStore, Query, QueryResult
 from backend.clip_model import ClipModel
 from backend.progress_websocket.progress_broadcaster import ProgressBroadcaster, ProgressAccumulator
+from backend.util import acquire_lock
 
 
 class SimpleClipEmbeddingStore(EmbeddingStore):
@@ -18,11 +20,14 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         self.store_file = store_file
         self.load_model = load_model
         self._clip_model = None
+        self.lock = Lock()
         self.embedding_dim = embedding_dim
         if store_file is not None and os.path.exists(store_file):
             self._load_from_store()
             if repair_store_file_case:
                 self.image_paths = _repair_image_paths_case(self.all_image_paths)
+            assert len(self.image_paths) == len(self.image_ids), f"store file {store_file} is corrupt"
+            assert len(self.image_paths) == self.image_embeddings.shape[0], f"store file {store_file} is corrupt"
 
         else:
             self.text_embeddings = torch.empty([0, self.embedding_dim])
@@ -32,9 +37,16 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             self.image_ids = []
 
     async def get_clip_model(self) -> ClipModel:
-        if self._clip_model is None:
-            self._clip_model = await self.load_model()
-        return self._clip_model
+        await self.lock.acquire()
+        clip_model = self._clip_model
+        if clip_model is None:
+            print('no model, loading')
+            clip_model = await self.load_model()
+            self._clip_model = clip_model
+        else:
+            print('have clip model, no need to load')
+        self.lock.release()
+        return clip_model
 
     @property
     def all_image_embeddings(self) -> torch.Tensor:
@@ -50,16 +62,22 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
 
     async def get_image_embedding(self, path: str) -> torch.Tensor:
         try:
+            await self.lock.acquire()
             index = self.image_paths.index(path)
-            return self.image_embeddings[index]
+            embedding = self.image_embeddings[index]
+            self.lock.release()
+            return embedding
         except ValueError:
             image_embedding = await self.add_image(path)
             return image_embedding
 
     async def get_text_embedding(self, text: str) -> torch.Tensor:
         try:
+            await self.lock.acquire()
             index = self.texts.index(text.lower())
-            return self.text_embeddings[index]
+            embedding = self.text_embeddings[index]
+            self.lock.release()
+            return embedding
         except ValueError:
             text_embedding = await self.add_text(text)
             return text_embedding
@@ -79,7 +97,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             for i, t in enumerate(query.images)
         ]
 
-        image_paths, image_ids, image_embeddings = self._filter_images_by_path_maybe(query.path_contains)
+        image_paths, image_ids, image_embeddings = await self._filter_images_by_path_maybe(query.path_contains)
 
         similarities = [await progress_accumulator.update() or torch.cosine_similarity(image_embeddings, q)
                         for q in query_embeddings]
@@ -91,17 +109,19 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
                             id=image_ids[i])
                 for i in ordered_indices[:limit]]
 
-    def _filter_images_by_path_maybe(self, path_contains: str = None) -> tuple[list[str], list[str], torch.Tensor]:
+    async def _filter_images_by_path_maybe(self, path_contains: str = None) -> tuple[list[str], list[str], torch.Tensor]:
+        await self.lock.acquire()
         if path_contains:
             path_contains = path_contains.lower()
             indices = [i for i, path in enumerate(self.image_paths) if path_contains in path.lower()]
             image_paths = [self.image_paths[i] for i in indices]
             image_ids = [self.image_ids[i] for i in indices]
-            image_embeddings = self.image_embeddings[torch.tensor(indices)]
+            image_embeddings = self.image_embeddings[torch.tensor(indices)].clone()
         else:
-            image_paths = self.image_paths
-            image_ids = self.image_ids
-            image_embeddings = self.image_embeddings
+            image_paths = list(self.image_paths)
+            image_ids = list(self.image_ids)
+            image_embeddings = self.image_embeddings.clone()
+        self.lock.release()
         return image_paths, image_ids, image_embeddings
 
 
@@ -118,10 +138,12 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             paths, batch_size=8)
         ])
         assert len(embeddings_to_add) == len(paths)
+        await self.lock.acquire()
         self.image_embeddings = torch.cat([self.image_embeddings, torch.stack(embeddings_to_add)])
         self.image_ids = self.image_ids + [str(uuid.uuid4()) for _ in range(len(paths))]
         self.image_paths.extend(paths)
-        self._save_to_store()
+        self.lock.release()
+        await self._save_to_store()
         await progress_accumulator.finish()
         return embeddings_to_add
 
@@ -131,9 +153,11 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
     async def add_text(self, text: str) -> torch.Tensor:
         clip_model = await self.get_clip_model()
         embedding_to_add = await clip_model.get_text_features(text.lower())
+        await self.lock.acquire()
         self.text_embeddings = torch.cat([self.text_embeddings, embedding_to_add.unsqueeze(dim=0)])
         self.texts.append(text)
-        self._save_to_store()
+        self.lock.release()
+        await self._save_to_store()
         return embedding_to_add
 
     def has_image(self, path: str) -> bool:
@@ -157,9 +181,10 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         else:
             raise RuntimeError(f"unrecognized store version in {self.store_file}: {version}")
 
-    def _save_to_store(self):
+    async def _save_to_store(self):
         if self.store_file is None:
             return
+        await self.lock.acquire()
         torch.save({
             'version': 2,
             'image_embeddings': self.image_embeddings,
@@ -168,13 +193,14 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             'text_embeddings': self.text_embeddings,
             'texts': self.texts,
         }, self.store_file)
+        self.lock.release()
 
 
 def _repair_image_paths_case(paths: list[str]) -> list[str]:
     parent_contents = {}
 
     def get_case_correct_path(path):
-        if path == "/" or path == "":
+        if path is None or path == "/" or path == "":
             return path
         parent = os.path.dirname(path).lower()
         case_correct_parent = get_case_correct_path(parent)

@@ -3,6 +3,9 @@ from queue import Queue
 from typing import ClassVar, Optional, Any, Callable, Awaitable
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
+from multiprocessing import Process, Queue
+
+from backend.util import safe_fire_and_forget
 
 
 class ProgressAccumulator:
@@ -28,7 +31,6 @@ class ProgressAccumulator:
 class ProgressBroadcaster:
 
     _instance: ClassVar[Any] = None
-    queue:
 
     @classmethod
     def instance(cls) -> "ProgressBroadcaster":
@@ -40,26 +42,23 @@ class ProgressBroadcaster:
         self.active_connections: list[WebSocket] = []
         self.counter = 0
 
+    def background_process_loop(self):
+        while True:
+            message = self.queue.get()
+
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
         print(f"websocket {websocket} connected, now have  {len(self.active_connections)}")
         message = f'hello you are #{self.counter}. you have {len(self.active_connections)-1} buddies here.'
         self.counter += 1
-        await self.send_personal_message(message, websocket)
+        await websocket.send_text(message)
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
         print("websocket disconnected, now have", len(self.active_connections))
 
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    async def broadcast_text(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
-
-    async def broadcast_json(self, message_json: Any):
+    def broadcast_json(self, message_json: Any):
         to_remove = []
         for connection in self.active_connections:
             if hasattr(connection, "client_state") and connection.client_state == WebSocketState.CONNECTED:
@@ -67,7 +66,7 @@ class ProgressBroadcaster:
             else:
                 print(f'connection {connection} is not ok')
             try:
-                await asyncio.wait_for(connection.send_json(message_json), timeout=0.5)
+                safe_fire_and_forget(lambda: asyncio.wait_for(connection.send_json(message_json), timeout=0.5))
                 print(f' - sent to {connection}')
             except (asyncio.TimeoutError, RuntimeError, ConnectionResetError) as e:
                 print(f' - {connection} broke with {e}, removing')
@@ -83,14 +82,14 @@ class ProgressBroadcaster:
             await connection.send_json(message_json)
             print(f' - sent to ', connection)
 
-    async def send_progress(self, label: str, progress: float):
+    def send_progress(self, label: str, progress: float):
         print(f'sending progress "{label}":{progress}')
-        await self.broadcast_json({'type': 'progress', 'data': {'label': label, 'progress': progress}})
+        self.broadcast_json({'type': 'progress', 'data': {'label': label, 'progress': progress}})
         print(f'sent progress "{label}":{progress}')
 
     def make_helper(self, total: int, label: str, send_every_n=None) -> ProgressAccumulator:
         async def do_send_progress(p):
-            await ProgressBroadcaster.instance().send_progress(label, p)
+            ProgressBroadcaster.instance().send_progress(label, p)
 
         return ProgressAccumulator(
             total = total,
