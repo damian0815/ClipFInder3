@@ -4,7 +4,7 @@ Pillow
 typing-extensions
 transformers
 numpy<2
-./ml-mobileclip
+git+https://github.com/ialhashim/ml-mobileclip.git
 Pillow>=10.0.0
 platformdirs>=3.0.0
 osxmetadata
