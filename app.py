@@ -1,26 +1,29 @@
 # Backend (app.py)
 import logging
+import traceback
 from typing import List
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-import os
 
-from tags_wrangler import TagsWrangler
+from clip_finder_backend.clip_modelling import AutoloadingClipModel
 
 print("imported fastapi")
 
-from backend.clip_embedding_store import Query
+from pydantic import BaseModel
+import os
+from tags_wrangler import TagsWrangler
+
+from clip_finder_backend.embedding_store import Query
 print("imported backend.clip_embedding_store.Query")
-from backend.simple_clip_embedding_store import SimpleClipEmbeddingStore
+from clip_finder_backend.embedding_store import SimpleClipEmbeddingStore
 print("imported backend.simple_clip_embedding_store.SimpleClipEmbeddingStore")
-from backend.thumbnail_provider import ThumbnailProvider
+from clip_finder_backend.thumbnail_provider import ThumbnailProvider
 
 from fastapi import FastAPI, HTTPException
 
-from backend.types import ZeroShotClassifyRequest, ImageResponse
-from backend.zero_shot import do_zero_shot_classify
+from clip_finder_backend.types import ZeroShotClassifyRequest, ImageResponse
+from clip_finder_backend.zero_shot import do_zero_shot_classify
 
 logging.basicConfig(level=logging.DEBUG,
                     format="%(asctime)s | %(levelname)-8s | "
@@ -29,17 +32,31 @@ logger = logging.getLogger(__name__)
 
 print("making embedding store")
 
-def load_mobile_clip_model():
-    from backend.mobile_clip_model import MobileClipModel
-    return MobileClipModel().load_model()
+def load_model():
+    if os.environ.get("CLIPFINDER_USE_MOCK_CLIP_MODEL", "0") == "1":
+        print("using mock clip model because CLIPFINDER_USE_MOCK_CLIP_MODEL=1")
+        from clip_finder_backend.mock_clip_model import MockClipModel
+        return MockClipModel()
 
-def load_mock_model():
-    from backend.mock_clip_model import MockClipModel
-    return MockClipModel()
+    model_type = os.environ.get("CLIPFINDER_CLIP_MODEL_TYPE", "MobileCLIP-S1")
+    pretrained = os.environ.get("CLIPFINDER_CLIP_MODEL_PRETRAINED", "datacompdr")
+    weights_pt_path = os.environ.get("CLIPFINDER_CLIP_MODEL_WEIGHTS_PT_PATH", None)
+    print("loading model:", model_type, "pretrained:", pretrained, "custom weights:", weights_pt_path)
+    print("Set env vars CLIPFINDER_CLIP_MODEL_TYPE, CLIPFINDER_CLIP_MODEL_PRETRAINED, CLIPFINDER_CLIP_MODEL_WEIGHTS_PT_PATH to change")
+    from clip_finder_backend.clip_modelling import ClipModel
+    return ClipModel(clip_name=model_type, pretrained=pretrained, weights_pt_path=weights_pt_path).load_model()
 
-embedding_store = SimpleClipEmbeddingStore(load_model=load_mobile_clip_model,
-                                           store_file='dev_embedding_store_simple.pt',
-                                           repair_store_file_case=True)
+
+def load_embedding_store():
+    store_file = os.environ.get("CLIPFINDER_CLIP_MODEL_STORE_FILE", None)
+    if store_file is None:
+        raise RuntimeError("env var CLIPFINDER_CLIP_MODEL_STORE_FILE must point to a path to load the embedding store")
+
+    print(f"loading existing embedding store from {store_file}")
+    clip_model = AutoloadingClipModel(load_model=load_model)
+    return SimpleClipEmbeddingStore(clip_model=clip_model, store_file=store_file, store_device='mps')
+embedding_store = load_embedding_store()
+
 print("making thumbnail provider")
 
 thumbnail_provider = ThumbnailProvider()
@@ -62,10 +79,16 @@ app.add_middleware(
 @app.get("/api/search")
 async def search_images(q: str = "", pathContains: str = None):
     print(f'searching - "{q}"')
-    query = Query.text_query(q, path_contains=pathContains)
-    results = embedding_store.search_images(query=query)
-    return [ImageResponse(id=r.id, path=r.path, distance=r.distance)
-            for r in results]
+    try:
+        query = Query.text_query(q)
+        query.path_contains = pathContains
+        results = embedding_store.search_images(query=query)
+        return [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
+                for r in results]
+    except Exception as e:
+        traceback.print_exc()
+        logging.error(f"error during search: {repr(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
@@ -163,7 +186,7 @@ def _build_images_tags(image_ids: list[str]) -> dict[str, list[str]]:
 
 @app.get("/api/thumbnail/{id}")
 async def serve_thumbnail(id: str):
-    original_path = embedding_store.get_image_path(id)
+    original_path = embedding_store.get_image_path_for_id(id)
     if not os.path.isfile(original_path):
         raise HTTPException(status_code=404, detail=f"Image not found: {original_path}")
 

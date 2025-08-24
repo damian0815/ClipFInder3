@@ -1,4 +1,4 @@
-from backend.types import ResultFilters
+from clip_finder_backend.types import ResultFilters
 
 
 def get_included_path_indices(filters: ResultFilters, image_paths: list[str]) -> list[int]:

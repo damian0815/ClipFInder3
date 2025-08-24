@@ -2,10 +2,8 @@ from typing import List, Generator
 
 import torch
 
-from backend.clip_model import ClipModel
 
-
-class MockClipModel(ClipModel):
+class MockClipModel:
 
     @property
     def embedding_dim(self):

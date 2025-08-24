@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from backend.util import get_tags
+from clip_finder_backend.util import get_tags
 
 from pydantic import BaseModel
 from pydantic.alias_generators import to_camel

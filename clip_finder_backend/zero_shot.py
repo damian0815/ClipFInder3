@@ -1,19 +1,19 @@
 import torch
-from backend.clip_embedding_store import EmbeddingStore
-from backend.types import ZeroShotClassifyRequest, ZeroShotClassification, ImageResponse
+from clip_finder_backend.embedding_store import SimpleClipEmbeddingStore
+from clip_finder_backend.types import ZeroShotClassifyRequest, ZeroShotClassification, ImageResponse
 from MulticoreTSNE import MulticoreTSNE as TSNE
 import logging
-from backend.filtering import get_included_path_indices
+from clip_finder_backend.filtering import get_included_path_indices
 
-def do_zero_shot_classify(embedding_provider: EmbeddingStore,
+def do_zero_shot_classify(embedding_provider: SimpleClipEmbeddingStore,
                           request: ZeroShotClassifyRequest):
 
     cls_results = []
 
-    indices = get_included_path_indices(filters=request.filters, image_paths=embedding_provider.all_image_paths)
-    image_ids = [embedding_provider.all_image_ids[i] for i in indices]
-    image_paths = [embedding_provider.all_image_paths[i] for i in indices]
-    image_embeddings = embedding_provider.all_image_embeddings[indices]
+    indices = get_included_path_indices(filters=request.filters, image_paths=embedding_provider.image_paths)
+    image_ids = [embedding_provider.image_ids[i] for i in indices]
+    image_paths = [embedding_provider.image_paths[i] for i in indices]
+    image_embeddings = embedding_provider.image_embeddings[indices]
 
     for cls in request.classes:
         cls_text_embeddings = torch.stack([embedding_provider.get_text_embedding(t) for t in cls.texts])
