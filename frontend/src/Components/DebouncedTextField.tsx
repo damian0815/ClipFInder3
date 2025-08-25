@@ -2,6 +2,7 @@ import {useEffect, useState} from "react";
 
 type DebouncedTextFieldProps = {
     value: string;
+    placeholder?: string;
     setDebouncedValue: (value: string) => void;
 };
 
@@ -21,7 +22,7 @@ function DebouncedTextField(props: DebouncedTextFieldProps) {
           <input
           className={"w-full"} 
         type="text"
-        placeholder="Search images..."
+        placeholder={props.placeholder || "Search images..."}
         value={value}
         onChange={(e) => setValue(e.target.value)}
       />

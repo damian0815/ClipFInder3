@@ -1,11 +1,12 @@
 import {useEffect, useState} from "react";
 import Image, {ResultImage} from "@/Components/Image.tsx";
 import Selectable from 'react-selectable-box';
-import { c } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
+import { API_BASE_URL } from "@/Constants";
 
 type ImageResultsGridProps = {
     images: Array<Image>;
     onSelect: (selectedImages: Array<Image>) => void; // Callback to pass selected images to parent
+    onAddToQuery: (image: Image) => void;
 }
 
 function ImageResultsGrid(props: ImageResultsGridProps) {
@@ -25,6 +26,11 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
             // Default behavior: replace selection
             setSelectedImages([img]);
         }
+    };
+
+    const handleRevealInFinder = (img: Image) => {
+        console.log("reveal in finder for image", img);
+        fetch(`${API_BASE_URL}/api/revealInFinder/${img.id}`);
     };
 
     useEffect(() => {
@@ -83,12 +89,15 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
                     }
                 }}
             >
+                
                 {props.images.map((img, index) => (
                     <ResultImage
-                        key={index}
+                        key={img.id}
                         image={img}
                         isSelected={selectedImages.includes(img)}
-                        onClick={(image, event) => handleImageClick(image, event)}
+                        onClick={(_) => handleImageClick(img)}
+                        onAddToQuery={() => props.onAddToQuery(img)}
+                        onRevealInFinder={() => handleRevealInFinder(img)}
                     />
                 ))}
 

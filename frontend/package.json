@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@radix-ui/react-context-menu": "^2.2.16",
     "@tailwindcss/vite": "^4.0.6",
     "common-path": "^1.0.1",
     "lucide-react": "^0.475.0",

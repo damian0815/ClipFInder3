@@ -83,6 +83,9 @@ async def search_images(q: str = "", pathContains: str = None):
         query = Query.text_query(q)
         query.path_contains = pathContains
         results = embedding_store.search_images(query=query)
+        for r in results:
+            if r.path != embedding_store.get_image_path_for_id(r.id):
+                logging.warning(f"found image {r.path} doesn't match id {r.id} path {embedding_store.get_image_path_for_id(r.id)}")
         return [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
                 for r in results]
     except Exception as e:
@@ -181,6 +184,21 @@ async def serve_all_known_tags():
     return {
         'all_known_tags': tags_wrangler.get_all_known_tags()
     }
+
+@app.get('/api/revealInFinder/{id}')
+async def handle_reveal_in_finder(id: str):
+    import subprocess
+    file_path = embedding_store.get_image_path_for_id(id)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail=f"Image not found: {file_path}")
+
+    try:
+        subprocess.run(['open', '-R', file_path], check=True)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error revealing file in Finder: {e}")
+        raise HTTPException(status_code=500, detail="Failed to reveal file in Finder")
+
+    return {'message': f'Revealed {file_path} in Finder'}
 
 
 def _build_images_tags(image_ids: list[str]) -> dict[str, list[str]]:
