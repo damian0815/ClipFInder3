@@ -94,7 +94,7 @@ async def search_images(q: str = "", pathContains: str = None):
 
 @app.get("/api/image/{id}")
 async def serve_image(id: str):
-    file_path = embedding_store.get_image_path(id)
+    file_path = embedding_store.get_image_path_for_id(id)
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail=f"Image not found: {file_path}")
     return FileResponse(file_path)
@@ -133,7 +133,7 @@ class AddTagRequest(BaseModel):
 
 @app.post("/api/addTag")
 async def add_tag(request: AddTagRequest):
-    image_paths = [embedding_store.get_image_path(id) for id in request.image_ids]
+    image_paths = [embedding_store.get_image_path_for_id(id) for id in request.image_ids]
 
     errors = []
     for image_path in image_paths:
@@ -154,7 +154,7 @@ class DeleteTagRequest(BaseModel):
 
 @app.post("/api/deleteTag")
 async def delete_tag(request: DeleteTagRequest):
-    image_paths = [embedding_store.get_image_path(id) for id in request.image_ids]
+    image_paths = [embedding_store.get_image_path_for_id(id) for id in request.image_ids]
     errors = []
     for image_path in image_paths:
         try:
@@ -170,7 +170,7 @@ async def delete_tag(request: DeleteTagRequest):
 @app.get("/api/tags/{id}")
 async def serve_tags(id: str):
     logging.info(f"fetching tags for {id}")
-    file_path = embedding_store.get_image_path(id)
+    file_path = embedding_store.get_image_path_for_id(id)
     return {
         'image': id,
         'tags': tags_wrangler.get_tags(file_path)
@@ -179,7 +179,7 @@ async def serve_tags(id: str):
 
 def _build_images_tags(image_ids: list[str]) -> dict[str, list[str]]:
     return [
-        {'id': image_id, 'tags': tags_wrangler.get_tags(embedding_store.get_image_path(image_id))}
+        {'id': image_id, 'tags': tags_wrangler.get_tags(embedding_store.get_image_path_for_id(image_id))}
         for image_id in image_ids
     ]
 
