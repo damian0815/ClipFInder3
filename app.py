@@ -183,7 +183,11 @@ def _build_images_tags(image_ids: list[str]) -> dict[str, list[str]]:
         for image_id in image_ids
     }
 
-
+@app.get("api/allKnownTags")
+async def serve_all_known_tags():
+    return {
+        'all_known_tags': tags_wrangler.get_all_known_tags()
+    }
 
 @app.get("/api/thumbnail/{id}")
 async def serve_thumbnail(id: str):

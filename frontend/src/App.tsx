@@ -90,6 +90,7 @@ function App() {
               <div className="sidebar-toggle" onClick={toggleSidebar}>
                   {sidebarOpen ? '›' : '‹'}
               </div>
+
                 <TagEditorSidebar
                     images={selectedImages}
                     requestDeleteTag={deleteTag}

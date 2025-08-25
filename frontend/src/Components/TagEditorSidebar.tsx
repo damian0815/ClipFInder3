@@ -1,6 +1,8 @@
 import Image from "@/Components/Image.tsx";
 import {useEffect, useState} from "react";
 import {API_BASE_URL} from "@/Constants.tsx";
+import {TagTextInput} from "@/Components/TagTextInput.tsx";
+import {useKnownTags} from "@/contexts/KnownTagsContext";
 
 type TagProps = {
     name: string
@@ -46,9 +48,9 @@ async function getTags(id: String) {
 export function TagEditorSidebar(props: TagEditorSidebarProps) {
 
     const [tags, setTags] = useState<Set<string>>(new Set());
-
     const [newTag, setNewTag] = useState("");
     const [isBusy, setIsBusy] = useState<boolean>(false);
+    const { refetchTags } = useKnownTags();
 
     async function updateTags() {
 
@@ -95,6 +97,9 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
                 }
             })
             updateTags();
+            setNewTag(""); // Clear the input after successful add
+            // Refresh the known tags list in case a new tag was added
+            refetchTags();
             //alert(`${data.message}`);
         })
         .catch(err => {
@@ -167,21 +172,19 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
                 )}
                 </div>
 
-                <div>
-                    <label htmlFor={"newTagNameInput"}>New tag name:</label>
-                    <input
-                        type="text"
-                        id={"newTagNameInput"}
-                        placeholder="new tag name..."
-                        readOnly={false}
-                        //value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        className={"border-1 border-solid border-gray w-5"}
-                    />
-                    <button onClick={(_) => addTag(props.images, newTag)}
-                            disabled={isBusy || newTag.trim().length === 0}
-                            className={"border"}>Add tag</button>
-                </div>
+                <TagTextInput
+                    value={newTag}
+                    onChange={setNewTag}
+                    onSubmit={(tag) => addTag(props.images, tag)}
+                    placeholder="new tag name..."
+                    id="newTagNameInput"
+                    label="New tag name:"
+                    className="border-1 border-solid border-gray w-48"
+                    disabled={isBusy}
+                    showSubmitButton={true}
+                    submitButtonText="Add tag"
+                    submitButtonDisabled={isBusy}
+                />
             </div>
         )}
     </div>
