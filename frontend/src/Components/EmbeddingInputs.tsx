@@ -26,7 +26,9 @@ function EmbeddingInputs(props: EmbeddingInputsProps) {
 
     return <>
         <div className={"border rounded-lg p-4"}>
-            <DebouncedTextField value={text} setDebouncedValue={(v) => setText(v)} />
+            <DebouncedTextField
+            value={text} 
+            setDebouncedValue={(v) => setText(v)} />
         </div>
     </>
 }

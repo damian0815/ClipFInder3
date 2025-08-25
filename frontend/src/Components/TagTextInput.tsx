@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useKnownTags } from "@/contexts/KnownTagsContext";
 
 export type TagTextInputProps = {
@@ -19,6 +19,18 @@ export function TagTextInput(props: TagTextInputProps) {
     const { knownTags, isLoading } = useKnownTags();
     const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+    const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+    const suggestionRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+    // Scroll selected item into view
+    useEffect(() => {
+        if (selectedIndex >= 0 && suggestionRefs.current[selectedIndex]) {
+            suggestionRefs.current[selectedIndex]?.scrollIntoView({
+                block: 'nearest',
+                behavior: 'smooth'
+            });
+        }
+    }, [selectedIndex]);
 
     const handleChange = (value: string) => {
         props.onChange(value);
@@ -30,14 +42,19 @@ export function TagTextInput(props: TagTextInputProps) {
                 .slice(0, 10); // Limit to 10 suggestions
             setFilteredSuggestions(filtered);
             setShowSuggestions(filtered.length > 0);
+            setSelectedIndex(-1); // Reset selection when suggestions change
+            suggestionRefs.current = []; // Reset refs array
         } else {
             setShowSuggestions(false);
+            setSelectedIndex(-1);
+            suggestionRefs.current = [];
         }
     };
 
     const selectSuggestion = (suggestion: string) => {
         props.onChange(suggestion);
         setShowSuggestions(false);
+        setSelectedIndex(-1);
     };
 
     const handleSubmit = () => {
@@ -47,16 +64,38 @@ export function TagTextInput(props: TagTextInputProps) {
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            if (showSuggestions && filteredSuggestions.length > 0) {
+        if (showSuggestions && filteredSuggestions.length > 0) {
+            if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                selectSuggestion(filteredSuggestions[0]);
-            } else if (props.value.trim().length > 0 && props.onSubmit) {
+                setSelectedIndex(prev => 
+                    prev < filteredSuggestions.length - 1 ? prev + 1 : 0
+                );
+            } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                handleSubmit();
+                setSelectedIndex(prev => 
+                    prev > 0 ? prev - 1 : filteredSuggestions.length - 1
+                );
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && selectedIndex < filteredSuggestions.length) {
+                    selectSuggestion(filteredSuggestions[selectedIndex]);
+                } else if (filteredSuggestions.length > 0) {
+                    selectSuggestion(filteredSuggestions[0]);
+                }
+            } else if (e.key === 'Escape') {
+                setShowSuggestions(false);
+                setSelectedIndex(-1);
             }
-        } else if (e.key === 'Escape') {
-            setShowSuggestions(false);
+        } else {
+            if (e.key === 'Enter') {
+                if (props.value.trim().length > 0 && props.onSubmit) {
+                    e.preventDefault();
+                    handleSubmit();
+                }
+            } else if (e.key === 'Escape') {
+                setShowSuggestions(false);
+                setSelectedIndex(-1);
+            }
         }
     };
 
@@ -90,8 +129,14 @@ export function TagTextInput(props: TagTextInputProps) {
                     {filteredSuggestions.map((suggestion, index) => (
                         <div
                             key={index}
-                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                            ref={(el) => { suggestionRefs.current[index] = el; }}
+                            className={`px-3 py-2 cursor-pointer text-sm ${
+                                index === selectedIndex 
+                                    ? 'bg-blue-100 text-blue-900' 
+                                    : 'hover:bg-gray-100'
+                            }`}
                             onMouseDown={() => selectSuggestion(suggestion)}
+                            onMouseEnter={() => setSelectedIndex(index)}
                         >
                             {suggestion}
                         </div>

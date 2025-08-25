@@ -19,6 +19,7 @@ function DebouncedTextField(props: DebouncedTextFieldProps) {
 
     return <>
           <input
+          className={"w-full"} 
         type="text"
         placeholder="Search images..."
         value={value}
