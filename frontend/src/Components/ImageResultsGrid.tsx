@@ -1,6 +1,7 @@
 import {useEffect, useState} from "react";
 import Image, {ResultImage} from "@/Components/Image.tsx";
-import Selectable, { useSelectable } from 'react-selectable-box';
+import Selectable from 'react-selectable-box';
+import { c } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 
 type ImageResultsGridProps = {
     images: Array<Image>;
@@ -13,14 +14,16 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     const [mouseIsOver, setMouseIsOver] = useState<boolean>(false);
 
     const handleImageClick = (img: Image) => {
-        switch (mode) {
-            case 'replace': setSelectedImages([img]); break;
-            default:
-                const isSelected = selectedImages.includes(img);
-                const newSelectedImages = isSelected
-                    ? selectedImages.filter(selectedImg => selectedImg !== img) // Deselect if already selected
-                    : [...selectedImages, img]; // Select the image
-                setSelectedImages(newSelectedImages);
+        if (mode === 'add' || mode === 'remove') {
+            const isSelected = selectedImages.includes(img);
+            if (!isSelected) {
+                setSelectedImages([...selectedImages, img]);
+            } else {
+                setSelectedImages(selectedImages.filter(selectedImg => selectedImg !== img));
+            }
+        } else {
+            // Default behavior: replace selection
+            setSelectedImages([img]);
         }
     };
 
@@ -30,14 +33,21 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     }, [selectedImages])
 
     useEffect(() => {
-
+        
         const updateMode = (e: KeyboardEvent) => {
-            if (e.metaKey == e.shiftKey) {
-                setMode('replace')
-            } else if (e.shiftKey) {
+            const shiftIsDown = e.shiftKey || (e.type === 'keydown' && e.key === 'Shift');
+            const metaIsDown = e.metaKey || (e.type === 'keydown' && e.key === 'Meta');
+            const ctrlIsDown = e.ctrlKey || (e.type === 'keydown' && e.key === 'Control');
+            const altIsDown = e.altKey || (e.type === 'keydown' && e.key === 'Alt');
+            if (shiftIsDown || metaIsDown) {
                 setMode('add')
-            } else if (e.metaKey) {
+                console.log('mode was', mode, 'now add')
+            } else if (altIsDown) {
                 setMode('remove')
+                console.log('mode was', mode, 'now remove')
+            } else {
+                console.log('mode was', mode, 'now replace')
+                setMode('replace')
             }
         };
 
@@ -52,8 +62,8 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
 
     return (
         <div className={"image-grid border-1 p-4"}
-             onMouseEnter={(e) => setMouseIsOver(true)}
-             onMouseLeave={(e) => setMouseIsOver(false)}
+             onMouseEnter={() => setMouseIsOver(true)}
+             onMouseLeave={() => setMouseIsOver(false)}
         >
 
             <Selectable
@@ -78,7 +88,7 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
                         key={index}
                         image={img}
                         isSelected={selectedImages.includes(img)}
-                        onClick={handleImageClick}
+                        onClick={(image, event) => handleImageClick(image, event)}
                     />
                 ))}
 

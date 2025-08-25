@@ -1,7 +1,7 @@
 import torch
 from clip_finder_backend.embedding_store import SimpleClipEmbeddingStore
 from clip_finder_backend.types import ZeroShotClassifyRequest, ZeroShotClassification, ImageResponse
-from MulticoreTSNE import MulticoreTSNE as TSNE
+#from MulticoreTSNE import MulticoreTSNE as TSNE
 import logging
 from clip_finder_backend.filtering import get_included_path_indices
 

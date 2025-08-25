@@ -16,7 +16,7 @@ dependencies = [
     'fastapi',
     'uvicorn',
     'pydantic',
-    'MulticoreTSNE'
+    #'MulticoreTSNE'
 ]
 
 [tool.setuptools]

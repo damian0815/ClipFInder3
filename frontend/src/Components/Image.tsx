@@ -12,7 +12,7 @@ export default interface Image {
 
 export type ResultImageProps = {
   image: Image
-  onClick: (image: Image) => void
+  onClick: (image: Image, event?: React.MouseEvent) => void
   isSelected: boolean
     className?: string
 }
@@ -29,14 +29,14 @@ export function ResultImage(props: ResultImageProps) {
       className={"p-2"}
       style={{
             border: isAdding ? '1px solid blue' : (isRemoving ? '1px solid red' : '1px solid transparent'), // Highlight selected images
-            background: isSelected ? '#1677ff20' : 'transparent',
+            background: isSelected ? '#1677ff40' : 'transparent', // More saturated blue with increased opacity
             zIndex: isHovered ? '100000' : '0',
           }}
     >
         <img
           src={`${API_BASE_URL}/api/thumbnail/${props.image.id}`}
           alt={props.image.path}
-          onClick={() => props.onClick(props.image)} // Handle click event
+          onClick={(event) => props.onClick(props.image, event)} // Handle click event with event object
           className={props.className || ''}
           onMouseEnter={(_) => setIsHovered(true)}
           onMouseLeave={(_) => setIsHovered(false)}

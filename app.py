@@ -178,10 +178,11 @@ async def serve_tags(id: str):
 
 
 def _build_images_tags(image_ids: list[str]) -> dict[str, list[str]]:
-    return [
-        {'id': image_id, 'tags': tags_wrangler.get_tags(embedding_store.get_image_path_for_id(image_id))}
+    return {
+        image_id: tags_wrangler.get_tags(embedding_store.get_image_path_for_id(image_id))
         for image_id in image_ids
-    ]
+    }
+
 
 
 @app.get("/api/thumbnail/{id}")
