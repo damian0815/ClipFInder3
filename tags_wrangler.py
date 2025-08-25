@@ -33,6 +33,8 @@ class TagsWrangler:
 
 def _load_known_tags() -> list[str]:
     known_tags_json = os.environ.get("CLIPFINDER_KNOWN_TAGS_JSON", None)
+    if known_tags_json is None:
+        raise RuntimeError("CLIPFINDER_KNOWN_TAGS_JSON is not set")
     if known_tags_json and os.path.exists(known_tags_json):
         try:
             with open(known_tags_json, 'r') as f:
@@ -40,3 +42,5 @@ def _load_known_tags() -> list[str]:
                 return tags
         except Exception as e:
             print(f"Error loading known tags from {known_tags_json}: {e}")
+    else:
+        raise RuntimeError(f"No known tags JSON file found at {known_tags_json}")

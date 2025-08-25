@@ -5,7 +5,7 @@ async function fetchAllKnownTags(): Promise<string[]> {
     return fetch(`${API_BASE_URL}/api/allKnownTags`)
                 .then(res => res.json())
                 .then(data => {
-                    return data
+                    return data['all_known_tags']
                 })
                 .catch(err => {
                     console.error(`error fetching all known tags: ${err}`)

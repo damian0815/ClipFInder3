@@ -176,6 +176,12 @@ async def serve_tags(id: str):
         'tags': tags_wrangler.get_tags(file_path)
     }
 
+@app.get("/api/allKnownTags")
+async def serve_all_known_tags():
+    return {
+        'all_known_tags': tags_wrangler.get_all_known_tags()
+    }
+
 
 def _build_images_tags(image_ids: list[str]) -> dict[str, list[str]]:
     return {
