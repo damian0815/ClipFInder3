@@ -31,20 +31,24 @@ function DistanceQuery(props: DistanceQueryProps) {
         }
     }, [embeddingInputs]);
 
+    const handleDeleteEmbeddingInput = (id: string) => {
+        const newEmbeddingInputs = embeddingInputs.filter(input => input.id !== id);
+        console.log("embeddings inputs:", newEmbeddingInputs.map(input => [input.id, input.text ?? 'undefined']));
+        setEmbeddingInputs(newEmbeddingInputs);
+    }
 
     return <>
-        <div className={"flex flex-row gap-4 border"}>
+        <div className={"gap-4 border"}>
 
-            <div className={'w-full flex-row border'}>
+            <div className={'flex flex-wrap gap-4 w-full border'}>
                 {embeddingInputs.map((input, i) => (
-                    <div className={"w-40 border"}>
-                        <EmbeddingInput key={input.id} embeddingInput={input} onDeleteRequested={() => {
-                            setEmbeddingInputs(embeddingInputs.filter((_, index) => index !== i));
-                        }} />
+                    <div className={"w-40 flex-shrink-0 border"}>
+                        <EmbeddingInput key={input.id} embeddingInput={input} />
+                        <button onClick={(_) => handleDeleteEmbeddingInput(input.id)}>❌</button>
                     </div>
                 ))}
-                <div className={'w-40 flex-row flex-none border'}>
-                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs, 
+                <div className={'w-40 flex-shrink-0 border inline-block'}>
+                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs,
                         new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, text:''})])}>
                         + Add Text Input
                     </button>

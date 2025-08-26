@@ -7,14 +7,13 @@ import { CorpusImage } from "./Image";
 
 type EmbeddingInputProps = {
     embeddingInput: EmbeddingInputData;
-    onDeleteRequested: () => void;
 }
 
 function EmbeddingInput(props: EmbeddingInputProps) {
 
     useTraceUpdate(props);
 
-    const [value, setValue] = useState<string>('')
+    const [value, setValue] = useState<string>(props.embeddingInput.value)
 
     useEffect(() => {
         switch (props.embeddingInput.mode) {
@@ -30,8 +29,7 @@ function EmbeddingInput(props: EmbeddingInputProps) {
         }
     }, [value])
 
-    return <div className={'w-40'}>
-
+    return <div className={'w-35'}>
         {(props.embeddingInput.mode === 'tags' || props.embeddingInput.mode === 'text') && (
             <div className={"border rounded-lg p-4"}>
                 <DebouncedTextField
@@ -45,7 +43,6 @@ function EmbeddingInput(props: EmbeddingInputProps) {
                 <CorpusImage id={props.id} />
             </div>
         )}
-        <button onClick={(_) => props.onDeleteRequested()}>❌</button>
     </div>
 }
 

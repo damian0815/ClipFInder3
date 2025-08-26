@@ -23,6 +23,16 @@ export class EmbeddingInputData {
         if (this.tags !== undefined) return 'tags';
         throw new Error('Invalid EmbeddingInputData');
     }
+    get value(): string {
+        switch (this.mode) {
+            case 'text':
+                return this.text ?? '';
+            case 'image':
+                return this.imageId ?? '';
+            case 'tags':
+                return this.tags?.join(',') ?? '';
+        }
+    }
 }
 
 export class FilterInputData {
