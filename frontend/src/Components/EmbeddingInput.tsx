@@ -9,6 +9,7 @@ import InputNumber from 'react-input-number';
 type EmbeddingInputProps = {
     embeddingInput: EmbeddingInputData;
     onDeleteClicked: (_: any) => void;
+    onQueryRequested: () => void;
 }
 
 function EmbeddingInput(props: EmbeddingInputProps) {
@@ -37,12 +38,19 @@ function EmbeddingInput(props: EmbeddingInputProps) {
                 <DebouncedTextField
                     value={value}
                     placeholder={props.embeddingInput.mode === 'tags' ? 'Enter tags (comma separated)...' : 'Enter text...'}
-                    setDebouncedValue={(v) => setValue(v)} />
+                    setDebouncedValue={(v) => setValue(v)}
+                    onEnterPressed={props.onQueryRequested} />
             </div>
         )}
         {(props.embeddingInput.mode === 'image') && (
             <div className={"border rounded-lg p-4"}>
-                <CorpusImage id={props.embeddingInput.imageId} />
+                <CorpusImage id={props.embeddingInput.imageId || ''} />
+                <button 
+                    className={"btn btn-primary border rounded w-full mt-1"}
+                    onClick={props.onQueryRequested}
+                >
+                    Query
+                </button>
             </div>
         )}
         <div className="grid grid-flow-col grid-rows-1 grid-cols-3 items-center">

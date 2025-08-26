@@ -8,15 +8,17 @@ import PIL
 import torch
 from PIL import Image
 from tqdm.auto import tqdm
+from pydantic import BaseModel, ConfigDict
 
 from clip_finder_backend.clip_modelling import ClipModel
 
 
-@dataclass
-class Query:
-    texts: List[str]
-    images: List[str]
-    embeddings: List[torch.Tensor]
+class Query(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    texts: List[str]|None = None
+    image_ids: List[str]|None = None
+    embeddings: List[list[float]]|None = None
     """1 weight for each text, image, and embedding in the query, in that order"""
     weights: List[float]
 
@@ -25,17 +27,17 @@ class Query:
 
     @staticmethod
     def text_query(text: str):
-        return Query(texts=[text], weights=[1], images=[], embeddings=[])
+        return Query(texts=[text], weights=[1], image_ids=[], embeddings=[])
 
     @staticmethod
     def text_query_with_weights(texts: list[str], weights: list[float]):
         if len(texts) != len(weights):
             raise ValueError("there must be 1 weight for each text")
-        return Query(texts=list(texts), weights=list(weights), images=[], embeddings=[])
+        return Query(texts=list(texts), weights=list(weights), image_ids=[], embeddings=[])
 
     @staticmethod
-    def vector_query(embedding: torch.Tensor):
-        return Query(texts=[], weights=[1], images=[], embeddings=[embedding])
+    def vector_query(embedding: list[float]):
+        return Query(texts=[], weights=[1], image_ids=[], embeddings=[embedding])
 
 
 @dataclass
@@ -202,29 +204,32 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
 
     def search_images(self, query: Query, limit=100) -> List[QueryResult]:
         weights = list(query.weights)
-        query_embeddings = [
+        all_embeddings = [
             self.get_text_embedding(t).unsqueeze(0)
             for t in query.texts
         ]
-        if query.images:
-            weight_index_offset = len(query_embeddings)
-            actual_paths, image_embeddings = self.get_image_embeddings(query.images)
+        if query.image_ids:
+            weight_index_offset = len(all_embeddings)
+            id_paths = [i for i in [self.get_image_path_for_id(i) for i in query.image_ids]
+                            if i is not None]
+            actual_paths, image_embeddings = self.get_image_embeddings(id_paths)
             missing_image_indices = [weight_index_offset + i
-                                   for i, p in enumerate(query.images)
+                                   for i, p in enumerate(id_paths)
                                    if p not in actual_paths]
             for index in reversed(missing_image_indices):
                 del weights[index]
-            query_embeddings.append(image_embeddings)
+            all_embeddings.append(image_embeddings)
 
-        query.embeddings.extend(query_embeddings)
+        if query.embeddings:
+            all_embeddings.extend([torch.tensor(e) for e in query.embeddings])
 
-        if any(len(t.shape) != 2 for t in query_embeddings):
+        if any(len(t.shape) != 2 for t in all_embeddings):
             raise ValueError("all query embeddings must be of shape [1, embedding_dim]")
-        query_embeddings = torch.cat(query_embeddings, dim=0).to(self.image_embeddings.device, dtype=self.image_embeddings.dtype)
-        if query_embeddings.shape[0] != len(weights):
+        all_embeddings = torch.cat(all_embeddings, dim=0).to(self.image_embeddings.device, dtype=self.image_embeddings.dtype)
+        if all_embeddings.shape[0] != len(weights):
             raise ValueError("there must be 1 weight for every embedding, text, or image in the query")
-        query_embeddings /= query_embeddings.norm(dim=-1, keepdim=True)
-        weights = torch.tensor(weights).to(query_embeddings.device, dtype=query_embeddings.dtype)
+        all_embeddings /= all_embeddings.norm(dim=-1, keepdim=True)
+        weights = torch.tensor(weights).to(all_embeddings.device, dtype=all_embeddings.dtype)
 
         if query.path_contains:
             indices, corpus_paths = zip(*[(i, p) for i, p in enumerate(self.image_paths) if query.path_contains in p])
@@ -234,7 +239,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             corpus_paths = self.image_paths
             corpus_embeddings = self.image_embeddings
             corpus_image_ids = self.image_ids
-        similarities = torch.matmul(query_embeddings, corpus_embeddings.T)
+        similarities = torch.matmul(all_embeddings, corpus_embeddings.T)
         weighted_similarities = (similarities.T * weights).T
         if query.reduce_method == 'sum':
             summed_similarities = weighted_similarities.sum(dim=0)

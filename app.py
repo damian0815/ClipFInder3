@@ -66,22 +66,25 @@ print("making FastAPI")
 
 app = FastAPI()
 
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:8080",
+]
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this in production
+    allow_origins=origins,  # Adjust this in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.get("/api/search")
-async def search_images(q: str = "", pathContains: str = None):
-    print(f'searching - "{q}"')
+@app.post("/api/search")
+async def search_images(query: Query):
+    print(f'searching - "{query}"')
     try:
-        query = Query.text_query(q)
-        query.path_contains = pathContains
         results = embedding_store.search_images(query=query)
         for r in results:
             if r.path != embedding_store.get_image_path_for_id(r.id):

@@ -4,6 +4,7 @@ type DebouncedTextFieldProps = {
     value: string;
     placeholder?: string;
     setDebouncedValue: (value: string) => void;
+    onEnterPressed?: () => void;
 };
 
 function DebouncedTextField(props: DebouncedTextFieldProps) {
@@ -25,6 +26,11 @@ function DebouncedTextField(props: DebouncedTextFieldProps) {
         placeholder={props.placeholder || "Search images..."}
         value={value}
         onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+            if (e.key === 'Enter' && props.onEnterPressed) {
+                props.onEnterPressed();
+            }
+        }}
       />
     </>
 
