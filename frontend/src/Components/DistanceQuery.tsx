@@ -37,14 +37,18 @@ function DistanceQuery(props: DistanceQueryProps) {
         setEmbeddingInputs(newEmbeddingInputs);
     }
 
+    const handleAddToQuery = (image: Image) => {
+        console.log("adding image to query:", image);
+        setEmbeddingInputs([...embeddingInputs, new EmbeddingInputData({id: `distanceQuery-${uuidv4()}`, imageId: image.id})]);
+    }
+
     return <>
         <div className={"gap-4 border"}>
 
             <div className={'flex flex-wrap gap-4 w-full border'}>
                 {embeddingInputs.map((input, i) => (
-                    <div className={"w-40 flex-shrink-0 border"}>
-                        <EmbeddingInput key={input.id} embeddingInput={input} />
-                        <button onClick={(_) => handleDeleteEmbeddingInput(input.id)}>❌</button>
+                    <div key={input.id} className={"w-40 flex-shrink-0 border"}>
+                        <EmbeddingInput embeddingInput={input} onDeleteClicked={(_) => handleDeleteEmbeddingInput(input.id)} />
                     </div>
                 ))}
                 <div className={'w-40 flex-shrink-0 border inline-block'}>
@@ -60,9 +64,7 @@ function DistanceQuery(props: DistanceQueryProps) {
             </div>
         </div>
         <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
-        <ImageResultsGrid images={images} onSelect={props.setSelectedImages} onAddToQuery={(image) => {
-            setEmbeddingInputs([...embeddingInputs, new EmbeddingInputData({id: `distanceQuery-${uuidv4()}`, imageId: image.id})]);
-        }} />
+        <ImageResultsGrid images={images} onSelect={props.setSelectedImages} onAddToQuery={handleAddToQuery} />
     </>
 
 

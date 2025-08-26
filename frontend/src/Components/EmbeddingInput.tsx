@@ -3,10 +3,12 @@ import DebouncedTextField from "@/Components/DebouncedTextField.tsx";
 import {EmbeddingInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import useTraceUpdate from "@/Components/TraceUpdate.tsx";
 import { CorpusImage } from "./Image";
+import InputNumber from 'react-input-number';
 
 
 type EmbeddingInputProps = {
     embeddingInput: EmbeddingInputData;
+    onDeleteClicked: (_: any) => void;
 }
 
 function EmbeddingInput(props: EmbeddingInputProps) {
@@ -29,9 +31,9 @@ function EmbeddingInput(props: EmbeddingInputProps) {
         }
     }, [value])
 
-    return <div className={'w-35'}>
+    return <div className={'w-45'}>
         {(props.embeddingInput.mode === 'tags' || props.embeddingInput.mode === 'text') && (
-            <div className={"border rounded-lg p-4"}>
+            <div className={"border rounded-lg p-1 w-40"}>
                 <DebouncedTextField
                     value={value}
                     placeholder={props.embeddingInput.mode === 'tags' ? 'Enter tags (comma separated)...' : 'Enter text...'}
@@ -40,9 +42,18 @@ function EmbeddingInput(props: EmbeddingInputProps) {
         )}
         {(props.embeddingInput.mode === 'image') && (
             <div className={"border rounded-lg p-4"}>
-                <CorpusImage id={props.id} />
+                <CorpusImage id={props.embeddingInput.imageId} />
             </div>
         )}
+        <div className="grid grid-flow-col grid-rows-1 grid-cols-3 items-center">
+            <div className={"border h-6 mr-1"}>Weight:</div>
+            <InputNumber
+                className="border rounded-lg pr-1 mt-0"
+                value={props.embeddingInput.weight}
+                onChange={(value: number) => props.embeddingInput.weight = value}
+                min={-5} max={5} step={0.1} />
+            <button className={""} onClick={(_) => props.onDeleteClicked(props.embeddingInput.id)}>❌</button>
+        </div>
     </div>
 }
 
