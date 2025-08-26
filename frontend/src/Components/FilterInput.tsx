@@ -16,21 +16,37 @@ export function FilterInput(props: FilterInputProps) {
     }, [pathContains])
 
     return <>
-        <div>
-            <input
-                type="text"
-                placeholder="Path contains"
-                value={pathContains}
-                onChange={(e) => setPathContains(e.target.value)}
-                style={{
-                    padding: '8px',
-                    marginBottom: '10px',
-                    fontSize: '16px',
-                    borderRadius: '4px',
-                    border: '1px solid #ccc',
-                    width: '100%'
-                }}
-            />
+        <div className={"p-1 w-full grid grid-cols-3 gap-2"}>
+            <label>
+                Path contains
+                <input
+                    type="text"
+                    placeholder="Path contains"
+                    value={pathContains}
+                    onChange={(e) => setPathContains(e.target.value)}
+                    className="border rounded-lg p-1 w-full"
+                />
+            </label>
+            <label>
+                -ve Tags
+                <input
+                    type="text"
+                    placeholder="Tags (positive, comma-separated)"
+                    value={pathContains}
+                    onChange={(e) => setPathContains(e.target.value)}
+                    className="border rounded-lg p-1 w-full"
+                />
+            </label>
+            <label>
+                +ve Tags
+                <input
+                    type="text"
+                    placeholder="Tags (negative, comma-separated)"
+                    value={pathContains}
+                    onChange={(e) => setPathContains(e.target.value)}
+                    className="border rounded-lg p-1 w-full"
+                />
+            </label>
         </div>
     </>
 

@@ -59,7 +59,13 @@ function EmbeddingInput(props: EmbeddingInputProps) {
                 className="border rounded-lg pr-1 mt-0"
                 value={props.embeddingInput.weight}
                 onChange={(value: number) => props.embeddingInput.weight = value}
-                min={-5} max={5} step={0.1} />
+                min={-5} max={5} step={0.1} 
+                onKeyUp={(e) => {
+                    if (e.key === 'Enter') {
+                        props.onQueryRequested();
+                    }
+                }}
+            />
             <button className={""} onClick={(_) => props.onDeleteClicked(props.embeddingInput.id)}>❌</button>
         </div>
     </div>

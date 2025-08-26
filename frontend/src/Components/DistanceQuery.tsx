@@ -18,6 +18,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[]>([])
     const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
     const [images, setImages] = useState<Image[]>([]);
+    const [queryInProgress, setQueryInProgress] = useState<boolean>(false);
 
     const performSearch = () => {
         if (embeddingInputs.length > 0) {
@@ -35,6 +36,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                 'weights': weights
             };
             console.log("query:", searchData)
+            setQueryInProgress(true)
 
             fetch(`${API_BASE_URL}/api/search`, {
                 method: 'POST',
@@ -50,6 +52,9 @@ function DistanceQuery(props: DistanceQueryProps) {
                 })
                 .catch(error => {
                     console.error('Search error:', error);
+                })
+                .finally(() => {
+                    setQueryInProgress(false);
                 });
         }
     };
@@ -88,14 +93,13 @@ function DistanceQuery(props: DistanceQueryProps) {
                     </button>
                 </div>
             </div>
-            {embeddingInputs.length > 0 &&
-                <button 
-                    className={"btn btn-primary border rounded w-full mt-1"}
-                    onClick={performSearch}
-                >
-                    Query
-                </button>
-            }
+            <button 
+                className={"btn btn-primary border rounded w-full mt-1"}
+                onClick={performSearch}
+                disabled={queryInProgress || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
+            >
+                {queryInProgress ? 'Searching...' : 'Search'}
+            </button>
         </div>
         <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
         <ImageResultsGrid images={images} onSelect={props.setSelectedImages} onAddToQuery={handleAddToQuery} />
