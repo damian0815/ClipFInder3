@@ -24,6 +24,8 @@ class Query(BaseModel):
 
     reduce_method: Literal['sum', 'max'] = 'sum'
     path_contains: str = None
+    required_image_ids: List[str] | None = None
+    excluded_image_ids: List[str] | None = None
 
     @staticmethod
     def text_query(text: str):
@@ -231,10 +233,42 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         all_embeddings /= all_embeddings.norm(dim=-1, keepdim=True)
         weights = torch.tensor(weights).to(all_embeddings.device, dtype=all_embeddings.dtype)
 
+        filtered_corpus_paths: set[str]|None = None
+        def intersect_corpus_paths(paths: list[str]):
+            nonlocal filtered_corpus_paths
+            if filtered_corpus_paths is None:
+                filtered_corpus_paths = set(paths)
+            else:
+                filtered_corpus_paths.intersection_update(set(paths))
+
+        def subtract_corpus_paths(paths: list[str]):
+            nonlocal filtered_corpus_paths
+            if filtered_corpus_paths is None:
+                filtered_corpus_paths = set(paths)
+            else:
+                filtered_corpus_paths.difference_update(set(paths))
+
         if query.path_contains:
-            indices, corpus_paths = zip(*[(i, p) for i, p in enumerate(self.image_paths) if query.path_contains in p])
-            corpus_embeddings = self.image_embeddings[list(indices)]
-            corpus_image_ids = [self.image_ids[i] for i in indices]
+            matching_corpus_paths = [p for p in self.image_paths if query.path_contains in p]
+            intersect_corpus_paths(matching_corpus_paths)
+
+        if query.required_image_ids:
+            matching_corpus_indices = [self.image_ids.index(image_id)
+                                       for image_id in query.required_image_ids]
+            matching_corpus_paths = [self.image_paths[i] for i in matching_corpus_indices]
+            intersect_corpus_paths(matching_corpus_paths)
+
+        if query.excluded_image_ids:
+            matching_corpus_indices = [self.image_ids.index(image_id)
+                                       for image_id in query.required_image_ids]
+            matching_corpus_paths = [self.image_paths[i] for i in matching_corpus_indices]
+            subtract_corpus_paths(matching_corpus_paths)
+
+        if filtered_corpus_paths is not None:
+            corpus_indices = [self.image_paths.index(p) for p in sorted(filtered_corpus_paths)]
+            corpus_paths = [self.image_paths[i] for i in corpus_indices]
+            corpus_embeddings = self.image_embeddings[corpus_indices]
+            corpus_image_ids = [self.image_ids[i] for i in corpus_indices]
         else:
             corpus_paths = self.image_paths
             corpus_embeddings = self.image_embeddings

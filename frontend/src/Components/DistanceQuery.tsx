@@ -29,12 +29,24 @@ function DistanceQuery(props: DistanceQueryProps) {
             const weights = textParts.map(input => input.weight).concat(
                 imageParts.map(input => input.weight), 
                 tagParts.map(input => input.weight));
-            const searchData = {
+            let searchData: Record<string, any> = {
                 'texts': textParts.map(input => input.text),
                 'image_ids': imageParts.map(input => input.imageId),
                 'tags': tagParts.map(input => input.tags),
                 'weights': weights
             };
+            if (filterInput.pathContains.length > 0) {
+                // Only include pathContains if it's non-empty
+                searchData['path_contains'] = filterInput.pathContains;
+            }
+            if (filterInput.excluded_tags.length > 0) {
+                // Only include excluded_tags if it's non-empty
+                searchData['excluded_image_ids'] = getImageIdsForTags(filterInput.excluded_tags);
+            }
+            if (filterInput.required_tags_and.length > 0) {
+                // Only include required_tags_and if it's non-empty
+                searchData['required_image_ids'] = getImageIdsForTags(filterInput.required_tags_and);
+            }
             console.log("query:", searchData)
             setQueryInProgress(true)
 
