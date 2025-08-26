@@ -1,0 +1,24 @@
+.ContextMenu {
+  position: absolute;
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 0.3rem;
+  padding: 1rem;
+  width: 12rem;
+  list-style: none;
+  margin: 0rem;
+}
+
+.ContextMenu li {
+  padding: 0.5rem;
+  margin: 0rem;
+  cursor: pointer;
+}
+
+.ContextMenu li:hover {
+  background: #7ae;
+}
+
+.ContextMenu li:not(:last-child) {
+  margin: 0 0 0.1rem;
+}
