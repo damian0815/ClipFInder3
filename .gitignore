@@ -8,4 +8,6 @@ __pycache__
 weaviate_data
 .idea
 .vscode
-*.pt
+*.pt.env
+.DS_Store
+.env
