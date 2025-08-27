@@ -1,5 +1,8 @@
 import json
 import os
+import asyncio
+import concurrent.futures
+import time
 from typing import Callable, Optional
 
 from tqdm.auto import tqdm
@@ -47,12 +50,16 @@ class TagsWrangler:
         self.tag_to_image_cache = {}
         if progress_callback:
             progress_callback(0)
+        progress_interval = max(1, len(self.all_paths) // 10)
         for i, path in enumerate(tqdm(self.all_paths)):
             try:
-                tags = self.get_tags(path)
-                self.tag_to_image_cache[path] = tags
-                if i%100 == 0 and progress_callback:
-                    progress_callback(i / len(self.all_paths))
+                if os.path.exists(path):
+                    tags = self.get_tags(path)
+                    self.tag_to_image_cache[path] = tags
+                    if i % progress_interval == 0 and progress_callback:
+                        progress_callback(i / len(self.all_paths))
+                        # Add a small delay to allow WebSocket messages to be sent
+                        time.sleep(0.01)  # 10ms delay every 100 files
             except Exception as e:
                 print(f"Error reading tags for {path}: {e}")
         if progress_callback:

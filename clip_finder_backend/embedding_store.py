@@ -27,6 +27,10 @@ class Query(BaseModel):
     required_image_ids: List[str] | None = None
     excluded_image_ids: List[str] | None = None
 
+    # Pagination parameters
+    offset: int = 0
+    limit: int = 100
+
     @staticmethod
     def text_query(text: str):
         return Query(texts=[text], weights=[1], image_ids=[], embeddings=[])
@@ -210,7 +214,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             text_embedding = self.add_text(text)
             return text_embedding
 
-    def search_images(self, query: Query, limit=100, progress_callback: Callable[[float, str], None] = None) -> List[QueryResult]:
+    def search_images(self, query: Query, progress_callback: Callable[[float, str], None] = None) -> List[QueryResult]:
         weights = list(query.weights)
         if progress_callback is not None:
             progress_callback(0, "Computing embeddings")
@@ -299,10 +303,15 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         if progress_callback is not None:
             progress_callback(1, "Finished")
 
+        # Apply pagination
+        start_idx = query.offset
+        end_idx = start_idx + query.limit
+        paginated_indices = ordered_indices[start_idx:end_idx]
+
         return [QueryResult(similarity=summed_similarities[i].item(),
                             path=corpus_paths[i],
                             id=corpus_image_ids[i])
-                for i in ordered_indices[:limit]]
+                for i in paginated_indices]
 
     def add_images_precomputed(self, paths: list[str], embeddings: torch.Tensor, save=False):
         new_indices = [i for i, p in enumerate(paths) if not self.has_image(p)]

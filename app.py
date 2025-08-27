@@ -1,4 +1,5 @@
 # Backend (app.py)
+import asyncio
 import logging
 import traceback
 import threading
@@ -81,13 +82,15 @@ app.add_middleware(
 @app.websocket("/ws/progress")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    await progress_manager.add_connection(websocket)
+    loop = asyncio.get_event_loop()
+    await progress_manager.add_connection(websocket, loop)
 
     try:
         # Keep the connection alive and handle any incoming messages
         while True:
             # You can add message handling here if needed
-            await websocket.receive_text()
+            #await websocket.receive_text()
+            await asyncio.sleep(1)  # Keep the connection but don't block
     except WebSocketDisconnect:
         await progress_manager.remove_connection(websocket)
     except Exception as e:
@@ -97,13 +100,11 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.on_event("startup")
 async def startup_event():
     """Start the progress manager when the FastAPI app starts"""
-    progress_manager.start()
     logger.info("Application startup complete")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Stop the progress manager when the FastAPI app shuts down"""
-    progress_manager.stop()
     logger.info("Application shutdown complete")
 
 

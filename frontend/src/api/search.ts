@@ -8,6 +8,9 @@ export interface SearchParams {
     path_contains?: string;
     excluded_image_ids?: string[];
     required_image_ids?: string[];
+    // Pagination parameters
+    offset?: number;
+    limit?: number;
 }
 
 export interface SearchResult {

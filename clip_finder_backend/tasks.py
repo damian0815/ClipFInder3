@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import traceback
+from asyncio import get_event_loop
 
 from clip_finder_backend.embedding_store import EmbeddingStore, Query
 from clip_finder_backend.progress_manager import ProgressManager
@@ -10,11 +12,15 @@ from clip_finder_backend.types import ImageResponse
 async def perform_search_task(task_id: str, query: Query, progress_manager: ProgressManager, embedding_store: EmbeddingStore):
     """Background task that performs the actual search and sends progress updates"""
     try:
-        progress_manager.start_task(task_id, "Searching images...")
+        await progress_manager.start_task(task_id, "Searching images...")
 
         # Perform the actual search
+        loop = asyncio.get_event_loop()
         def on_search_progress(progress: float, message: str=None):
-            progress_manager.update_task_progress(task_id, progress*100, message=message)
+            asyncio.run_coroutine_threadsafe(
+                progress_manager.update_task_progress(task_id, progress*100, message=message),
+                loop
+            )
         results = embedding_store.search_images(query=query, progress_callback=on_search_progress)
 
         # Validate results as before
@@ -26,12 +32,12 @@ async def perform_search_task(task_id: str, query: Query, progress_manager: Prog
         search_results = [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
                          for r in results]
 
-        progress_manager.complete_task(task_id, "Search completed", data=search_results)
+        await progress_manager.complete_task(task_id, "Search completed", data=search_results)
 
     except Exception as e:
         traceback.print_exc()
         logging.error(f"error during search: {repr(e)}")
-        progress_manager.fail_task(task_id, f"Search failed", error_details=repr(e))
+        await progress_manager.fail_task(task_id, f"Search failed", error_details=repr(e))
 
 
 
@@ -39,20 +45,23 @@ async def perform_get_images_by_tags_task(task_id: str, tags: list[str], progres
     """Background task that performs the actual images fetch and sends progress updates"""
     try:
         print("starting get images by tags task")
-        progress_manager.start_task(task_id, "Getting images by tags...")
+        await progress_manager.start_task(task_id, "Getting images by tags...")
 
         # Perform the actual search
+        event_loop = get_event_loop()
         def on_get_images_progress(progress: float, message: str=None):
-            progress_manager.update_task_progress(task_id, progress*100, message=message)
-
+            asyncio.run_coroutine_threadsafe(
+                progress_manager.update_task_progress(task_id, progress*100, message=message),
+                event_loop
+            )
         image_paths = tags_wrangler.get_images_for_tags(tags, progress_callback=on_get_images_progress)
         image_ids = embedding_store.get_image_ids_for_paths(image_paths)
 
-        progress_manager.complete_task(task_id, "Get images by tags complete", data=image_ids)
+        await progress_manager.complete_task(task_id, "Get images by tags complete", data=image_ids)
         print("finished get images by tags task")
 
     except Exception as e:
         traceback.print_exc()
         logging.error(f"error during images by tags fetch: {repr(e)}")
-        progress_manager.fail_task(task_id, f"Get images by tags failed", error_details=repr(e))
+        await progress_manager.fail_task(task_id, f"Get images by tags failed", error_details=repr(e))
 

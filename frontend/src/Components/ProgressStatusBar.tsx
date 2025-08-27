@@ -1,5 +1,6 @@
 import { useProgressWebSocketContext } from '@/contexts/ProgressWebSocketContext';
 import { ProgressMessage } from '@/types/progress';
+import {useEffect} from "react";
 
 interface ProgressBarProps {
     task: ProgressMessage;
@@ -87,6 +88,9 @@ export function ProgressStatusBar({ className = '', maxVisible = 5 }: ProgressSt
     /*if (activeTasks.length === 0 && connectionStatus === 'connected') {
         return null; // Don't show anything when no active tasks
     }*/
+    useEffect(() => {
+        console.log("ProgressStatusBar activeTasks changed:", activeTasks);
+    }, [activeTasks]);
 
     const visibleTasks = [...activeTasks.values()].slice(-maxVisible); // Show most recent tasks
 
