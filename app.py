@@ -8,7 +8,7 @@ from typing import List
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from pydantic import BaseModel
 
 from clip_finder_backend.clip_modelling import AutoloadingClipModel
@@ -108,21 +108,48 @@ async def shutdown_event():
     logger.info("Application shutdown complete")
 
 
-@app.post("/api/search")
-async def search_images(query: Query):
-    print(f'searching - "{query}"')
+class SearchTaskResponse(BaseModel):
+    task_id: str
+    message: str
+
+async def perform_search_task(task_id: str, query: Query):
+    """Background task that performs the actual search and sends progress updates"""
     try:
+        progress_manager.start_task(task_id, "Searching images...")
+
+        # Perform the actual search
         results = embedding_store.search_images(query=query)
+
+        # Validate results as before
         for r in results:
             if r.path != embedding_store.get_image_path_for_id(r.id):
                 logging.warning(f"found image {r.path} doesn't match id {r.id} path {embedding_store.get_image_path_for_id(r.id)}")
-        return [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
-                for r in results]
+
+        # Convert to response format
+        search_results = [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
+                         for r in results]
+
+        progress_manager.complete_task(task_id, "Search completed", data=search_results)
+
     except Exception as e:
         traceback.print_exc()
         logging.error(f"error during search: {repr(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        progress_manager.fail_task(task_id, f"Search failed: {str(e)}")
 
+@app.post("/api/search", response_model=SearchTaskResponse)
+async def search_images(query: Query, background_tasks: BackgroundTasks):
+    print(f'starting search - "{query}"')
+
+    # Generate a unique task ID
+    task_id = str(uuid.uuid4())
+
+    # Add the search task to background tasks
+    background_tasks.add_task(perform_search_task, task_id, query)
+
+    return SearchTaskResponse(
+        task_id=task_id,
+        message="Search started. Use WebSocket to receive progress updates."
+    )
 
 
 @app.get("/api/image/{id}")

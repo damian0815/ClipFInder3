@@ -174,7 +174,7 @@ class ProgressManager:
         )
         self.send_progress_update(progress_msg)
 
-    def complete_task(self, task_id: str, message: str = "", data: Optional[Dict[str, Any]] = None):
+    def complete_task(self, task_id: str, message: str = "", data: Optional[List[Any]|Dict[str, Any]] = None):
         """Convenience method to mark a task as completed"""
         progress_msg = ProgressMessage(
             task_id=task_id,

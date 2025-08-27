@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/Constants.tsx";
+import {API_BASE_URL} from "@/Constants.tsx";
 
 export interface SearchParams {
     texts?: string[];
@@ -18,13 +18,18 @@ export interface SearchResult {
     order_key: number | number[] | undefined;
 }
 
+export interface SearchTaskResponse {
+    task_id: string;
+    message: string;
+}
+
 /**
- * Performs a semantic search with multiple embedding inputs
+ * Starts a background search task
  * @param searchParams Search parameters including texts, images, tags, and filters
- * @returns Promise that resolves to an array of search results
+ * @returns Promise that resolves to search task information
  */
-export async function performSearch(searchParams: SearchParams): Promise<SearchResult[]> {
-    console.log("searching: ", searchParams)
+export async function startSearch(searchParams: SearchParams): Promise<SearchTaskResponse> {
+    console.log("starting search: ", searchParams)
     try {
         const response = await fetch(`${API_BASE_URL}/api/search`, {
             method: 'POST',
@@ -36,13 +41,12 @@ export async function performSearch(searchParams: SearchParams): Promise<SearchR
 
         if (!response.ok) {
             console.error("search failed: ", await response.json())
-            throw new Error(`HTTP error! nono status: ${response.status}, body: ${await response.text()}`);
+            throw new Error(`HTTP error! status: ${response.status}, body: ${await response.text()}`);
         }
 
-        const data = await response.json();
-        return data || [];
+        return await response.json();
     } catch (error) {
-        console.error('Error performing search:', error);
+        console.error('Error starting search:', error);
         throw error;
     }
 }

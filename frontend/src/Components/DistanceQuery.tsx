@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useState, useEffect} from "react";
 import Image from "@/Components/Image.tsx";
 import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import EmbeddingInput from "@/Components/EmbeddingInput";
@@ -6,7 +6,8 @@ import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputDat
 import {FilterInput} from "@/Components/FilterInput.tsx";
 import {v4 as uuidv4} from 'uuid';
 import {getImageIdsForTags} from "@/api/tags";
-import {performSearch as apiPerformSearch, SearchParams} from "@/api/search";
+import {startSearch as startSearch, SearchParams} from "@/api/search";
+import {useProgressWebSocket} from "@/hooks/useProgressWebSocket";
 
 
 type DistanceQueryProps = {
@@ -20,6 +21,27 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
     const [images, setImages] = useState<Image[]>([]);
     const [queryInProgress, setQueryInProgress] = useState<boolean>(false);
+    const [currentSearchTaskId, setCurrentSearchTaskId] = useState<string | null>(null);
+
+    const { activeTasks } = useProgressWebSocket();
+
+    // Listen for search completion
+    useEffect(() => {
+        if (currentSearchTaskId && activeTasks.has(currentSearchTaskId)) {
+            const task = activeTasks.get(currentSearchTaskId)!;
+
+            if (task.status === 'completed' && task.data) {
+                console.log('Search completed:', task.data);
+                setImages(task.data);
+                setQueryInProgress(false);
+                setCurrentSearchTaskId(null);
+            } else if (task.status === 'failed') {
+                console.error('Search failed:', task.message);
+                setQueryInProgress(false);
+                setCurrentSearchTaskId(null);
+            }
+        }
+    }, [activeTasks, currentSearchTaskId]);
 
     const performSearch = async () => {
         if (embeddingInputs.length > 0) {
@@ -61,14 +83,15 @@ function DistanceQuery(props: DistanceQueryProps) {
                 
                 console.log("query:", searchParams);
 
-                // Use the API function
-                const results = await apiPerformSearch(searchParams);
-                console.log(results);
-                setImages(results);
+                // Start the search task
+                const taskData = await startSearch(searchParams);
+                setCurrentSearchTaskId(taskData.task_id);
+
+                console.log('Search started with task ID:', taskData.task_id);
             } catch (error) {
                 console.error('Search error:', error);
-            } finally {
                 setQueryInProgress(false);
+                setCurrentSearchTaskId(null);
             }
         }
     };
