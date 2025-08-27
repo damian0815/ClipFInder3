@@ -12,7 +12,7 @@ export interface TagsTaskResponse {
  * @param matchAll Whether to require ALL tags (true) or ANY tags (false)
  * @returns Promise that resolves to task information
  */
-export async function getImageIdsForTagsAsync(tags: string[], taskId: string, matchAll: boolean = true): Promise<TagsTaskResponse> {
+export async function getImageIdsForTagsAsync(tags: string[], taskId: string, matchAll: boolean = true) {
     if (!tags || tags.length === 0) {
         throw new Error("No tags provided");
     }
@@ -33,9 +33,8 @@ export async function getImageIdsForTagsAsync(tags: string[], taskId: string, ma
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}, body: ${await response.text()}`);
         }
+        console.log("images by tag fetch started:", await response.json());
 
-        const data = await response.json();
-        return data;
     } catch (error) {
         console.error('Error starting tags task:', error);
         throw error;

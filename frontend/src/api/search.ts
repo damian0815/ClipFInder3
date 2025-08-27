@@ -44,8 +44,9 @@ export async function startSearchWithTaskId(searchParams: SearchParams, taskId: 
         });
 
         if (!response.ok) {
-            console.error("search failed: ", await response.json())
-            throw new Error(`HTTP error! status: ${response.status}, body: ${await response.text()}`);
+            const responseJson = await response.json()
+            console.error("search failed: ", responseJson)
+            throw new Error(`HTTP error! status: ${response.status}, body: ${JSON.stringify(responseJson)}`);
         }
 
         const data = await response.json();
@@ -75,8 +76,9 @@ export async function startSearch(searchParams: SearchParams, taskId: string): P
         });
 
         if (!response.ok) {
-            console.error("search failed: ", await response.json())
-            throw new Error(`HTTP error! status: ${response.status}, body: ${await response.text()}`);
+            const responseJson = await response.json()
+            console.error("search failed: ", responseJson)
+            throw new Error(`HTTP error! status: ${response.status}, body: ${JSON.stringify(responseJson)}`);
         }
 
         return await response.json();

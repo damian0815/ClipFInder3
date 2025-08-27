@@ -178,7 +178,7 @@ class ProgressManager:
         """Convenience method to mark a task as completed"""
         progress_msg = ProgressMessage(
             task_id=task_id,
-            status=ProgressStatus.COMPLETED,
+            status=status,
             progress=100.0,
             message=message,
             data=data

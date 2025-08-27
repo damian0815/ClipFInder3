@@ -122,7 +122,8 @@ async def search_images(search_params: SearchRequest, background_tasks: Backgrou
     print(f'starting search - "{query}"')
 
     # Add the search task to background tasks
-    background_tasks.add_task(perform_search_task, task_id, query)
+    background_tasks.add_task(perform_search_task, task_id, query,
+                              progress_manager=progress_manager, embedding_store=embedding_store)
 
     return TaskResponse(
         task_id=task_id,
@@ -146,7 +147,7 @@ class ImagesByTagsInput(BaseModel):
 async def get_images_by_tags(input: ImagesByTagsInput, background_tasks: BackgroundTasks):
     task_id = input.task_id or str(f'tags-by-images-{uuid.uuid4()}')
     background_tasks.add_task(
-        perform_get_images_by_tags_task, task_id, input.tags,
+        perform_get_images_by_tags_task, task_id=task_id, tags=input.tags,
         progress_manager=progress_manager, embedding_store=embedding_store, tags_wrangler=tags_wrangler
     )
     return TaskResponse(

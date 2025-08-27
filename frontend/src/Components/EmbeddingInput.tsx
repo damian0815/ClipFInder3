@@ -14,7 +14,7 @@ type EmbeddingInputProps = {
 
 function EmbeddingInput(props: EmbeddingInputProps) {
 
-    useTraceUpdate(props);
+    //useTraceUpdate(props);
 
     const [value, setValue] = useState<string>(props.embeddingInput.value)
 

@@ -47,11 +47,7 @@ async def perform_get_images_by_tags_task(task_id: str, tags: list[str], progres
         image_paths = tags_wrangler.get_images_for_tags(tags, progress_callback=on_get_images_progress)
         image_ids = embedding_store.get_image_ids_for_paths(image_paths)
 
-        # Convert to response format
-        images = [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
-                         for r in image_ids]
-
-        progress_manager.complete_task(task_id, "Get images by tags complete", data=images)
+        progress_manager.complete_task(task_id, "Get images by tags complete", data=image_ids)
 
     except Exception as e:
         traceback.print_exc()

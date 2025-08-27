@@ -8,7 +8,7 @@ export interface AsyncTaskOptions {
 }
 
 export interface AsyncTaskResult<T> {
-    startTask: (taskFn: (taskId: string) => Promise<void>) => Promise<void>;
+    runTask: (taskFn: (taskId: string) => Promise<T>) => Promise<T>;
     isLoading: boolean;
     error: string | null;
     data: T | null;
@@ -57,7 +57,7 @@ export function useAsyncTask<T>(options: AsyncTaskOptions = {}): AsyncTaskResult
         }
     }, [activeTasks, currentTaskId, options]);
 
-    const startTask = useCallback(async (taskFn: (taskId: string) => Promise<void>) => {
+    const runTask = useCallback(async (taskFn: (taskId: string) => Promise<any>) => {
         try {
             setIsLoading(true);
             setError(null);
@@ -69,11 +69,11 @@ export function useAsyncTask<T>(options: AsyncTaskOptions = {}): AsyncTaskResult
             setCurrentTaskId(taskId);
 
             // Execute the task function with the generated task ID
-            await taskFn(taskId);
+            return await taskFn(taskId);
 
         } catch (err) {
-            console.error('Task start error:', err);
-            setError(err instanceof Error ? err.message : 'Failed to start task');
+            console.error('Task run error:', err);
+            setError(err instanceof Error ? err.message : 'Failed to run task');
             setIsLoading(false);
             setCurrentTaskId(null);
             setProgress(null);
@@ -89,7 +89,7 @@ export function useAsyncTask<T>(options: AsyncTaskOptions = {}): AsyncTaskResult
     }, []);
 
     return {
-        startTask,
+        runTask: runTask,
         isLoading,
         error,
         data,

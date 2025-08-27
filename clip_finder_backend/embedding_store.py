@@ -248,16 +248,14 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         def intersect_corpus_paths(paths: list[str]):
             nonlocal filtered_corpus_paths
             if filtered_corpus_paths is None:
-                filtered_corpus_paths = set(paths)
-            else:
-                filtered_corpus_paths.intersection_update(set(paths))
+                filtered_corpus_paths = set(self.image_paths)
+            filtered_corpus_paths.intersection_update(set(paths))
 
         def subtract_corpus_paths(paths: list[str]):
             nonlocal filtered_corpus_paths
             if filtered_corpus_paths is None:
-                filtered_corpus_paths = set(paths)
-            else:
-                filtered_corpus_paths.difference_update(set(paths))
+                filtered_corpus_paths = set(self.image_paths)
+            filtered_corpus_paths.difference_update(set(paths))
 
         if query.path_contains:
             matching_corpus_paths = [p for p in self.image_paths if query.path_contains in p]

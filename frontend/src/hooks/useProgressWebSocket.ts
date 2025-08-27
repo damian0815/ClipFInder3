@@ -30,7 +30,7 @@ export function useProgressWebSocket(): UseProgressWebSocketData {
             wsRef.current = new WebSocket(WEBSOCKET_URL);
 
             wsRef.current.onopen = () => {
-                console.log('Progress WebSocket connected');
+                //console.log('Progress WebSocket connected');
                 setConnectionStatus('connected');
                 reconnectAttempts.current = 0;
             };
@@ -38,7 +38,7 @@ export function useProgressWebSocket(): UseProgressWebSocketData {
             wsRef.current.onmessage = (event) => {
                 try {
                     const message: ProgressMessage = JSON.parse(event.data);
-                    console.log('Progress update:', message);
+                    //console.log('Progress update:', message);
                     
                     setMessages(prev => [...prev.slice(-99), message]); // Keep last 100 messages
                     
@@ -65,7 +65,7 @@ export function useProgressWebSocket(): UseProgressWebSocketData {
             };
 
             wsRef.current.onclose = (event) => {
-                console.log('Progress WebSocket disconnected:', event.code, event.reason);
+                //console.log('Progress WebSocket disconnected:', event.code, event.reason);
                 setConnectionStatus('disconnected');
                 
                 if (!event.wasClean && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {

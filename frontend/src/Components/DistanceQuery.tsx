@@ -5,9 +5,9 @@ import EmbeddingInput from "@/Components/EmbeddingInput";
 import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import {FilterInput} from "@/Components/FilterInput.tsx";
 import {v4 as uuidv4} from 'uuid';
-import {getImageIdsForTags} from "@/api/tags";
 import {startSearchWithTaskId, SearchParams} from "@/api/search";
 import {useAsyncTask} from "@/hooks/useAsyncTask";
+import {getImageIdsForTagsAsync} from "@/api";
 
 
 type DistanceQueryProps = {
@@ -22,12 +22,54 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     // Use the new async task hook instead of manual state management
     const searchTask = useAsyncTask<Image[]>();
+    const tagFetchTask = useAsyncTask<string[]>();
+
+    const cancelSearch = () => {
+        if (searchTask.isLoading && searchTask.taskId) {
+            console.log("cancelling search task:", searchTask.taskId);
+            searchTask.reset();
+        }
+    };
 
     const performSearch = async () => {
         if (embeddingInputs.length === 0) {
             console.log("can't perform search, no inputs")
         } else {
-            await searchTask.startTask(async (taskId) => {
+            console.log('starting search', embeddingInputs, filterInput)
+            var excludedImageIds: string[]|undefined = undefined
+            var requiredImageIds: string[]|undefined = undefined
+            // tag filtering
+            if ((filterInput.negativeTags ?? "").trim().length > 0) {
+                const taskResult = await tagFetchTask.runTask(async (taskId) => {
+                    const negativeTags = filterInput.negativeTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
+                    await getImageIdsForTagsAsync(negativeTags, taskId, true);
+                    console.log("tagFetchTask:", tagFetchTask)
+                    while (tagFetchTask.isLoading || tagFetchTask.data === undefined) {
+                        console.log('waiting for tag fetch task to complete...')
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    console.log("completed tagFetchTask:", tagFetchTask, tagFetchTask.data)
+                    return [...tagFetchTask.data ?? []]
+                });
+                console.log("taskResult:", taskResult)
+                excludedImageIds = taskResult
+                console.log("excluded images:", excludedImageIds)
+            }
+            if ((filterInput.positiveTags ?? "").trim().length > 0) {
+                requiredImageIds = await tagFetchTask.runTask(async (taskId) => {
+                    const positiveTags = filterInput.positiveTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
+                    await getImageIdsForTagsAsync(positiveTags, taskId, true);
+                    while (tagFetchTask.isLoading || tagFetchTask.data === undefined) {
+                        console.log('waiting for tag fetch task to complete...')
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    return [...tagFetchTask.data ?? []]
+                });
+                console.log("required images:", requiredImageIds)
+            }
+
+
+            await searchTask.runTask(async (taskId) => {
 
                 // Build the search payload with weights
                 const textParts = embeddingInputs.filter(input => input.mode === 'text');
@@ -43,23 +85,13 @@ function DistanceQuery(props: DistanceQueryProps) {
                     tags: tagParts.map(input => input.tags).filter(Boolean) as string[][],
                     weights: weights,
                     path_contains: undefined,
-                    excluded_image_ids: undefined,
-                    required_image_ids: undefined,
+                    excluded_image_ids: excludedImageIds,
+                    required_image_ids: requiredImageIds,
                 };
 
                 console.log("filters:", filterInput.pathContains, filterInput.positiveTags, filterInput.negativeTags)
                 if ((filterInput.pathContains ?? "").trim().length > 0) {
                     searchParams.path_contains = filterInput.pathContains!;
-                }
-                
-                // tag filtering
-                if ((filterInput.negativeTags ?? "").trim().length > 0) {
-                    searchParams.excluded_image_ids = await getImageIdsForTags(filterInput.negativeTags!.split(",").map(tag => tag.trim()));
-                    console.log("excluded images:", searchParams.excluded_image_ids)
-                }
-                if ((filterInput.positiveTags ?? "").trim().length > 0) {
-                    searchParams.required_image_ids = await getImageIdsForTags(filterInput.positiveTags!.split(",").map(tag => tag.trim()));
-                    console.log("required images:", searchParams.required_image_ids)
                 }
                 
                 console.log("query:", searchParams);
@@ -104,18 +136,25 @@ function DistanceQuery(props: DistanceQueryProps) {
                     </button>
                 </div>
             </div>
-            <button 
-                className={"btn btn-primary border rounded w-full mt-1"}
-                onClick={performSearch}
-                disabled={searchTask.isLoading || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
-            >
-                {searchTask.isLoading ? 'Searching...' : 'Search'}
-            </button>
+            <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
+            <div className={"w-full flex flex-row justify-around"}>
+                <button
+                    className={"btn btn-primary border rounded w-1/3 h-10 mt-1"}
+                    onClick={performSearch}
+                    disabled={searchTask.isLoading || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
+                >
+                    {searchTask.isLoading ? 'Searching...' : `Search (${embeddingInputs.filter(input => input.value).length} non-empty inputs)`}
+                </button>
+                <button
+                    className={"btn btn-primary border rounded w-1/3 h-10 mt-1"}
+                    onClick={cancelSearch}
+                    disabled={!searchTask.isLoading}
+                >Cancel search</button>
+            </div>
             {searchTask.error && (
                 <div className="text-red-500 mt-2">Error: {searchTask.error}</div>
             )}
         </div>
-        <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
         <ImageResultsGrid images={searchTask.data || []} onSelect={props.setSelectedImages} onAddToQuery={handleAddToQuery} />
     </>
 
