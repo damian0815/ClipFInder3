@@ -32,22 +32,22 @@ export function FilterInput(props: FilterInputProps) {
                 />
             </label>
             <label>
-                -ve Tags
+                Required Tags
                 <input
                     type="text"
                     placeholder="Tags (positive, comma-separated)"
-                    value={negativeTags}
-                    onChange={(e) => setNegativeTags(e.target.value)}
+                    value={positiveTags}
+                    onChange={(e) => setPositiveTags(e.target.value)}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>
             <label>
-                +ve Tags
+                Excluded Tags
                 <input
                     type="text"
                     placeholder="Tags (negative, comma-separated)"
-                    value={positiveTags}
-                    onChange={(e) => setPositiveTags(e.target.value)}
+                    value={negativeTags}
+                    onChange={(e) => setNegativeTags(e.target.value)}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>

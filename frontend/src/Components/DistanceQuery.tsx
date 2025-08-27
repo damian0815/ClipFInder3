@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useState, useRef} from "react";
 import Image from "@/Components/Image.tsx";
 import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import EmbeddingInput from "@/Components/EmbeddingInput";
@@ -25,12 +25,16 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [searchError, setSearchError] = useState<string | null>(null);
     const [searchIsRunning, setSearchIsRunning] = useState(false);
 
+    // Use ref to track cancellation state to avoid closure issues
+    const searchCancelledRef = useRef(false);
+
     // Use the async task manager for all tasks
     const taskManager = useAsyncTaskManager();
 
     const cancelSearch = () => {
         if (searchIsRunning) {
             console.log("cancelling search task");
+            searchCancelledRef.current = true;
             setSearchIsRunning(false);
             setSearchError("Search cancelled");
         }
@@ -41,6 +45,12 @@ function DistanceQuery(props: DistanceQueryProps) {
             console.log("can't perform search, no inputs")
         } else {
             console.log('starting search', embeddingInputs, filterInput)
+
+            // Reset cancellation flag
+            searchCancelledRef.current = false;
+            setSearchIsRunning(true);
+            setSearchError(null);
+
             var excludedImageIds: string[]|undefined = undefined
             var requiredImageIds: string[]|undefined = undefined
             // tag filtering
@@ -51,6 +61,10 @@ function DistanceQuery(props: DistanceQueryProps) {
                     await getImageIdsForTagsAsync(negativeTags, taskId, true);
                     console.log("taskData:", taskData)
                     while (taskData.isLoading || taskData.data === undefined) {
+                        // Check for cancellation using ref
+                        if (searchCancelledRef.current) {
+                            throw new Error("Search cancelled");
+                        }
                         //console.log('waiting for tag fetch task (negative tags) to complete...')
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
@@ -71,6 +85,10 @@ function DistanceQuery(props: DistanceQueryProps) {
                     await getImageIdsForTagsAsync(positiveTags, taskId, true);
                     console.log("taskData:", taskData)
                     while (taskData.isLoading || taskData.data === undefined) {
+                        // Check for cancellation using ref
+                        if (searchCancelledRef.current) {
+                            throw new Error("Search cancelled");
+                        }
                         //console.log('waiting for tag fetch task (positive tags) to complete...')
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
@@ -86,10 +104,6 @@ function DistanceQuery(props: DistanceQueryProps) {
             }
 
 
-            setSearchIsRunning(true);
-            setSearchError(null);
-            setResultImages([]);
-            
             try {
                 const searchResult = await taskManager.runTask(async (taskId, taskData) => {
                     // Build the search payload with weights
@@ -117,18 +131,13 @@ function DistanceQuery(props: DistanceQueryProps) {
                     
                     console.log("query:", searchParams);
 
-                    console.log("starting search, searIsRunning is", searchIsRunning)
-
                     // Start the search with the task ID
                     await startSearchWithTaskId(searchParams, taskId);
-                    
-                    console.log("started search, searIsRunning is", searchIsRunning)
 
                     // Wait for the search to complete and get results from taskData
                     while (taskData.isLoading || taskData.data === undefined) {
-                        console.log("waiting for completion, searIsRunning is", searchIsRunning)
-                        // Check if search was cancelled
-                        if (!searchIsRunning) {
+                        // Check if search was cancelled using ref instead of state
+                        if (searchCancelledRef.current) {
                             throw new Error("Search cancelled");
                         }
                         console.log('waiting for search task to complete...')
