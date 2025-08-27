@@ -3,6 +3,7 @@ import Image from "@/types/image";
 import { ResultImage } from "@/Components/ResultImage";
 import Selectable from 'react-selectable-box';
 import { API_BASE_URL } from "@/Constants";
+import { QuickLookOverlay } from "@/Components/QuickLookOverlay";
 
 type ImageResultsGridProps = {
     images: Array<Image>;
@@ -14,6 +15,10 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     const [selectedImages, setSelectedImages] = useState<Array<Image>>([]);
     const [mode, setMode] = useState<'add' | 'remove' | 'replace' | 'reverse'>('replace');
     const [mouseIsOver, setMouseIsOver] = useState<boolean>(false);
+    const [quickLookVisible, setQuickLookVisible] = useState<boolean>(false);
+
+    // Get the last selected image for Quick Look
+    const lastSelectedImage = selectedImages.length > 0 ? selectedImages[selectedImages.length - 1] : null;
 
     const handleImageClick = (ev: React.MouseEvent, img: Image) => {
         if (ev.shiftKey || ev.metaKey) {
@@ -46,6 +51,18 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
             const metaIsDown = e.metaKey || (e.type === 'keydown' && e.key === 'Meta');
             const ctrlIsDown = e.ctrlKey || (e.type === 'keydown' && e.key === 'Control');
             const altIsDown = e.altKey || (e.type === 'keydown' && e.key === 'Alt');
+
+            // Handle Space key for Quick Look
+            if (e.type === 'keydown' && e.key === ' ') {
+                console.log("caught space key, lastSelectedImage:", lastSelectedImage, "quickLookVisible:", quickLookVisible);
+                if (lastSelectedImage && !quickLookVisible) {
+                    console.log("showing QuickLook for", lastSelectedImage)
+                    e.preventDefault();
+                    setQuickLookVisible(true);
+                    return;
+                }
+            }
+
             if (shiftIsDown || metaIsDown) {
                 setMode('add')
                 console.log('mode was', mode, 'now add')
@@ -65,7 +82,7 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
             document.removeEventListener('keydown', updateMode);
             document.removeEventListener('keyup', updateMode);
         };
-    }, []);
+    }, [mode, lastSelectedImage, quickLookVisible]);
 
     return (
         <div className={"image-grid border-1 p-4"}
@@ -103,6 +120,13 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
                 ))}
 
             </Selectable>
+
+            {quickLookVisible && lastSelectedImage && (
+                <QuickLookOverlay
+                    image={lastSelectedImage}
+                    onClose={() => setQuickLookVisible(false)}
+                />
+            )}
 
         </div>
     );
