@@ -1,17 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { API_BASE_URL } from "@/Constants.tsx";
-
-async function fetchAllKnownTags(): Promise<string[]> {
-    return fetch(`${API_BASE_URL}/api/allKnownTags`)
-                .then(res => res.json())
-                .then(data => {
-                    return data['all_known_tags']
-                })
-                .catch(err => {
-                    console.error(`error fetching all known tags: ${err}`)
-                    return []
-                })
-}
+import { getAllTags } from "@/api/tags";
 
 interface KnownTagsContextType {
     knownTags: string[];
@@ -35,7 +23,7 @@ export function KnownTagsProvider({ children }: KnownTagsProviderProps) {
         try {
             setIsLoading(true);
             setError(null);
-            const tags = await fetchAllKnownTags();
+            const tags = await getAllTags();
             setKnownTags(tags);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load tags');

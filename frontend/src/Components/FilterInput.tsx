@@ -7,13 +7,17 @@ type FilterInputProps = {
 }
 
 export function FilterInput(props: FilterInputProps) {
-    const [pathContains, setPathContains] = useState<string>(props.initialFilterInput.pathContains[0])
+    const [pathContains, setPathContains] = useState<string|undefined>(props.initialFilterInput.pathContains)
+    const [negativeTags, setNegativeTags] = useState<string|undefined>(props.initialFilterInput.negativeTags)
+    const [positiveTags, setPositiveTags] = useState<string|undefined>(props.initialFilterInput.positiveTags)
 
     useEffect(() => {
         const data = new FilterInputData()
-        data.pathContains = [pathContains]
+        data.pathContains = pathContains
+        data.negativeTags = negativeTags
+        data.positiveTags = positiveTags
         props.setFilterInput(data)
-    }, [pathContains])
+    }, [pathContains, negativeTags, positiveTags])
 
     return <>
         <div className={"p-1 w-full grid grid-cols-3 gap-2"}>
@@ -32,8 +36,8 @@ export function FilterInput(props: FilterInputProps) {
                 <input
                     type="text"
                     placeholder="Tags (positive, comma-separated)"
-                    value={pathContains}
-                    onChange={(e) => setPathContains(e.target.value)}
+                    value={negativeTags}
+                    onChange={(e) => setNegativeTags(e.target.value)}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>
@@ -42,8 +46,8 @@ export function FilterInput(props: FilterInputProps) {
                 <input
                     type="text"
                     placeholder="Tags (negative, comma-separated)"
-                    value={pathContains}
-                    onChange={(e) => setPathContains(e.target.value)}
+                    value={positiveTags}
+                    onChange={(e) => setPositiveTags(e.target.value)}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>

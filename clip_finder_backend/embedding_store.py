@@ -227,6 +227,9 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
 
         if any(len(t.shape) != 2 for t in all_embeddings):
             raise ValueError("all query embeddings must be of shape [1, embedding_dim]")
+        if len(all_embeddings) == 0:
+            print("Empty query, returning no results")
+            return []
         all_embeddings = torch.cat(all_embeddings, dim=0).to(self.image_embeddings.device, dtype=self.image_embeddings.dtype)
         if all_embeddings.shape[0] != len(weights):
             raise ValueError("there must be 1 weight for every embedding, text, or image in the query")
@@ -260,7 +263,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
 
         if query.excluded_image_ids:
             matching_corpus_indices = [self.image_ids.index(image_id)
-                                       for image_id in query.required_image_ids]
+                                       for image_id in query.excluded_image_ids]
             matching_corpus_paths = [self.image_paths[i] for i in matching_corpus_indices]
             subtract_corpus_paths(matching_corpus_paths)
 
@@ -391,6 +394,11 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             'text_embeddings': self.text_embeddings,
             'texts': self.texts,
         }, path)
+
+
+    def get_image_ids_for_paths(self, image_paths):
+        indices = [self.image_paths.index(p) for p in image_paths if p in self.image_paths]
+        return [self.image_ids[i] for i in indices]
 
 
 def _compute_md5_hash(path):

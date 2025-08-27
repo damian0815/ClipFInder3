@@ -14,7 +14,7 @@ export default interface Image {
 
 export type ResultImageProps = {
   image: Image
-  onClick: (event?: React.MouseEvent) => void
+  onClick: (event?: React.MouseEvent, image: Image) => void
   onAddToQuery: (img: Image) => void
   onRevealInFinder: (img: Image) => void
   isSelected: boolean
@@ -40,7 +40,7 @@ export function ResultImage(props: ResultImageProps) {
       <ContextMenu.Root>
         <ContextMenu.Trigger className="ContextMenuTrigger">
           <div
-            onClick={(event) => props.onClick(props.image, event)} // Handle click event with event object
+            onClick={(event) => props.onClick(event, props.image)} // Handle click event with event object
             className={props.className || ''}
             onMouseEnter={(_) => setIsHovered(true)}
             onMouseLeave={(_) => setIsHovered(false)}

@@ -1,18 +1,28 @@
 import json
 import os
+from tqdm.auto import tqdm
 
 from osxmetadata import OSXMetaData, Tag, FINDER_COLOR_NONE
 
 class TagsWrangler:
 
-    def __init__(self):
+    def __init__(self, all_paths: list[str]):
         self.known_tags = _load_known_tags()
+        self.all_paths = all_paths
+        self.tag_to_image_cache = None
 
     def get_all_known_tags(self):
         return self.known_tags
 
     def get_tags_for_images(self, image_paths: list[str]) -> dict[str, list[str]]:
         return {p: self.get_tags(p) for p in image_paths}
+
+    def get_images_for_tags(self, tags: list[str]) -> list[str]:
+        if self.tag_to_image_cache is None:
+            self._populate_tag_to_image_cache()
+        paths = [p for p, file_tags in self.tag_to_image_cache.items()
+                 if any(t in file_tags for t in tags)]
+        return paths
 
     def get_tags(self, image_path: str) -> list[str]:
         md = OSXMetaData(image_path)
@@ -29,6 +39,14 @@ class TagsWrangler:
         md = OSXMetaData(image_path)
         md.tags = [t for t in md.tags if t.name != tag_name]
 
+    def _populate_tag_to_image_cache(self):
+        self.tag_to_image_cache = {}
+        for path in tqdm(self.all_paths):
+            try:
+                tags = self.get_tags(path)
+                self.tag_to_image_cache[path] = tags
+            except Exception as e:
+                print(f"Error reading tags for {path}: {e}")
 
 
 def _load_known_tags() -> list[str]:
@@ -44,3 +62,4 @@ def _load_known_tags() -> list[str]:
             print(f"Error loading known tags from {known_tags_json}: {e}")
     else:
         raise RuntimeError(f"No known tags JSON file found at {known_tags_json}")
+    return []

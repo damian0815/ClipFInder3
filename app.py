@@ -60,7 +60,7 @@ embedding_store = load_embedding_store()
 print("making thumbnail provider")
 
 thumbnail_provider = ThumbnailProvider()
-tags_wrangler = TagsWrangler()
+tags_wrangler = TagsWrangler(embedding_store.image_paths)
 
 print("making FastAPI")
 
@@ -104,6 +104,15 @@ async def serve_image(id: str):
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=404, detail=f"Image not found: {file_path}")
     return FileResponse(file_path)
+
+class ImagesByTagsInput(BaseModel):
+    tags: List[str]
+    match_all: bool = False
+
+@app.post("/api/images/by-tags")
+async def serve_image(tags: ImagesByTagsInput):
+    image_paths = tags_wrangler.get_images_for_tags(tags.tags)
+    return embedding_store.get_image_ids_for_paths(image_paths)
 
 
 @app.post("/api/zero-shot-classify")

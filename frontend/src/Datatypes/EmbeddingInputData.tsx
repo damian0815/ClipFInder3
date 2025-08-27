@@ -37,9 +37,8 @@ export class EmbeddingInputData {
 }
 
 export class FilterInputData {
-    pathContains: string[] = []
-    pathNotContains: string[] = []
-    required_tags_and: string[] = []
-    required_tags_or: string[] = []
-    excluded_tags: string[] = []
+    pathContains?: string = undefined
+    pathNotContains?: string = undefined
+    positiveTags?: string = undefined
+    negativeTags?: string = undefined
 }

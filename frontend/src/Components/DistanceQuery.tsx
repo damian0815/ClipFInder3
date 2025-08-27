@@ -1,11 +1,12 @@
 import {useState} from "react";
-import {API_BASE_URL} from "@/Constants.tsx";
 import Image from "@/Components/Image.tsx";
 import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import EmbeddingInput from "@/Components/EmbeddingInput";
 import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import {FilterInput} from "@/Components/FilterInput.tsx";
 import {v4 as uuidv4} from 'uuid';
+import {getImageIdsForTags} from "@/api/tags";
+import {performSearch as apiPerformSearch, SearchParams} from "@/api/search";
 
 
 type DistanceQueryProps = {
@@ -20,54 +21,55 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [images, setImages] = useState<Image[]>([]);
     const [queryInProgress, setQueryInProgress] = useState<boolean>(false);
 
-    const performSearch = () => {
+    const performSearch = async () => {
         if (embeddingInputs.length > 0) {
-            // Build the search payload with weights
-            const textParts = embeddingInputs.filter(input => input.mode === 'text');
-            const imageParts = embeddingInputs.filter(input => input.mode === 'image');
-            const tagParts = embeddingInputs.filter(input => input.mode === 'tags');
-            const weights = textParts.map(input => input.weight).concat(
-                imageParts.map(input => input.weight), 
-                tagParts.map(input => input.weight));
-            let searchData: Record<string, any> = {
-                'texts': textParts.map(input => input.text),
-                'image_ids': imageParts.map(input => input.imageId),
-                'tags': tagParts.map(input => input.tags),
-                'weights': weights
-            };
-            if (filterInput.pathContains.length > 0) {
-                // Only include pathContains if it's non-empty
-                searchData['path_contains'] = filterInput.pathContains;
-            }
-            if (filterInput.excluded_tags.length > 0) {
-                // Only include excluded_tags if it's non-empty
-                searchData['excluded_image_ids'] = getImageIdsForTags(filterInput.excluded_tags);
-            }
-            if (filterInput.required_tags_and.length > 0) {
-                // Only include required_tags_and if it's non-empty
-                searchData['required_image_ids'] = getImageIdsForTags(filterInput.required_tags_and);
-            }
-            console.log("query:", searchData)
-            setQueryInProgress(true)
+            try {
+                setQueryInProgress(true);
+                
+                // Build the search payload with weights
+                const textParts = embeddingInputs.filter(input => input.mode === 'text');
+                const imageParts = embeddingInputs.filter(input => input.mode === 'image');
+                const tagParts = embeddingInputs.filter(input => input.mode === 'tags');
+                const weights = textParts.map(input => input.weight).concat(
+                    imageParts.map(input => input.weight), 
+                    tagParts.map(input => input.weight));
+                
+                let searchParams: SearchParams = {
+                    texts: textParts.map(input => input.text).filter(Boolean) as string[],
+                    image_ids: imageParts.map(input => input.imageId).filter(Boolean) as string[],
+                    tags: tagParts.map(input => input.tags).filter(Boolean) as string[][],
+                    weights: weights,
+                    path_contains: undefined,
+                    excluded_image_ids: undefined,
+                    required_image_ids: undefined,
+                };
 
-            fetch(`${API_BASE_URL}/api/search`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(searchData),
-            })
-                .then(res => res.json())
-                .then(data => {
-                    console.log(data);
-                    setImages(data)
-                })
-                .catch(error => {
-                    console.error('Search error:', error);
-                })
-                .finally(() => {
-                    setQueryInProgress(false);
-                });
+                console.log("filters:", filterInput.pathContains, filterInput.positiveTags, filterInput.negativeTags)
+                if ((filterInput.pathContains ?? "").trim().length > 0) {
+                    searchParams.path_contains = filterInput.pathContains!;
+                }
+                
+                // tag filtering
+                if ((filterInput.negativeTags ?? "").trim().length > 0) {
+                    searchParams.excluded_image_ids = await getImageIdsForTags(filterInput.negativeTags!.split(",").map(tag => tag.trim()));
+                    console.log("excluded images:", searchParams.excluded_image_ids)
+                }
+                if ((filterInput.positiveTags ?? "").trim().length > 0) {
+                    searchParams.required_image_ids = await getImageIdsForTags(filterInput.positiveTags!.split(",").map(tag => tag.trim()));
+                    console.log("required images:", searchParams.required_image_ids)
+                }
+                
+                console.log("query:", searchParams);
+
+                // Use the API function
+                const results = await apiPerformSearch(searchParams);
+                console.log(results);
+                setImages(results);
+            } catch (error) {
+                console.error('Search error:', error);
+            } finally {
+                setQueryInProgress(false);
+            }
         }
     };
 
