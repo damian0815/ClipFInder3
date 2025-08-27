@@ -2,7 +2,7 @@ import hashlib
 import os
 import uuid
 from dataclasses import dataclass, field
-from typing import Protocol, List, Literal
+from typing import Protocol, List, Literal, Callable
 
 import PIL
 import torch
@@ -204,8 +204,10 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             text_embedding = self.add_text(text)
             return text_embedding
 
-    def search_images(self, query: Query, limit=100) -> List[QueryResult]:
+    def search_images(self, query: Query, limit=100, progress_callback: Callable[[float, str], None] = None) -> List[QueryResult]:
         weights = list(query.weights)
+        if progress_callback is not None:
+            progress_callback(0, "Computing embeddings")
         all_embeddings = [
             self.get_text_embedding(t).unsqueeze(0)
             for t in query.texts
@@ -276,6 +278,10 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             corpus_paths = self.image_paths
             corpus_embeddings = self.image_embeddings
             corpus_image_ids = self.image_ids
+
+        if progress_callback is not None:
+            progress_callback(0.25, "Computing similarities")
+
         similarities = torch.matmul(all_embeddings, corpus_embeddings.T)
         weighted_similarities = (similarities.T * weights).T
         if query.reduce_method == 'sum':
@@ -285,6 +291,9 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         else:
             raise ValueError(f"unknown reduction method {query.reduce_method}")
         ordered_indices = torch.argsort(summed_similarities, dim=0, descending=True)
+
+        if progress_callback is not None:
+            progress_callback(1, "Finished")
 
         return [QueryResult(similarity=summed_similarities[i].item(),
                             path=corpus_paths[i],

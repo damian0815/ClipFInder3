@@ -118,7 +118,9 @@ async def perform_search_task(task_id: str, query: Query):
         progress_manager.start_task(task_id, "Searching images...")
 
         # Perform the actual search
-        results = embedding_store.search_images(query=query)
+        def on_search_progress(progress: float, message: str=None):
+            progress_manager.update_task_progress(task_id, progress*100, message=message)
+        results = embedding_store.search_images(query=query, progress_callback=on_search_progress)
 
         # Validate results as before
         for r in results:
@@ -136,12 +138,15 @@ async def perform_search_task(task_id: str, query: Query):
         logging.error(f"error during search: {repr(e)}")
         progress_manager.fail_task(task_id, f"Search failed: {str(e)}")
 
-@app.post("/api/search", response_model=SearchTaskResponse)
-async def search_images(query: Query, background_tasks: BackgroundTasks):
-    print(f'starting search - "{query}"')
+class SearchRequest(BaseModel):
+    task_id: str
+    query: Query
 
-    # Generate a unique task ID
-    task_id = str(uuid.uuid4())
+@app.post("/api/search", response_model=SearchTaskResponse)
+async def search_images(search_params: SearchRequest, background_tasks: BackgroundTasks):
+    query = search_params.query
+    task_id = search_params.task_id
+    print(f'starting search - "{query}"')
 
     # Add the search task to background tasks
     background_tasks.add_task(perform_search_task, task_id, query)

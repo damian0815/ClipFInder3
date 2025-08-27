@@ -28,7 +28,7 @@ class ProgressMessage:
     task_id: str
     status: ProgressStatus
     progress: float = 0.0  # 0-100
-    message: str = ""
+    message: Optional[str] = None
     current_step: Optional[str] = None
     total_steps: Optional[int] = None
     current_step_number: Optional[int] = None
@@ -154,9 +154,9 @@ class ProgressManager:
         )
         self.send_progress_update(progress_msg)
 
-    def update_task_progress(self, task_id: str, progress: float, message: str = "",
+    def update_task_progress(self, task_id: str, progress: float, message: Optional[str] = None,
                            current_step: Optional[str] = None, current_step_number: Optional[int] = None,
-                           data: Optional[Dict[str, Any]] = None):
+                           data: Optional[List[Any]|Dict[str, Any]] = None):
         """Convenience method to update task progress"""
         # Get existing task info
         existing_task = self.active_tasks.get(task_id)

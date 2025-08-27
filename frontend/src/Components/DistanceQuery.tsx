@@ -27,6 +27,7 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     // Listen for search completion
     useEffect(() => {
+
         if (currentSearchTaskId && activeTasks.has(currentSearchTaskId)) {
             const task = activeTasks.get(currentSearchTaskId)!;
 
@@ -44,7 +45,9 @@ function DistanceQuery(props: DistanceQueryProps) {
     }, [activeTasks, currentSearchTaskId]);
 
     const performSearch = async () => {
-        if (embeddingInputs.length > 0) {
+        if (embeddingInputs.length === 0) {
+            console.log("can't perform search, no inputs")
+        } else {
             try {
                 setQueryInProgress(true);
                 
@@ -84,8 +87,9 @@ function DistanceQuery(props: DistanceQueryProps) {
                 console.log("query:", searchParams);
 
                 // Start the search task
-                const taskData = await startSearch(searchParams);
-                setCurrentSearchTaskId(taskData.task_id);
+                const taskId = "search-" + uuidv4();
+                setCurrentSearchTaskId(taskId)
+                const taskData = await startSearch(searchParams, taskId);
 
                 console.log('Search started with task ID:', taskData.task_id);
             } catch (error) {
