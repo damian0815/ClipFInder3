@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from clip_finder_backend.clip_modelling import AutoloadingClipModel
 from clip_finder_backend.progress_manager import ProgressManager
 from clip_finder_backend.embedding_store import Query, SimpleClipEmbeddingStore
+from clip_finder_backend.tasks import perform_search_task, perform_get_images_by_tags_task
 from clip_finder_backend.thumbnail_provider import ThumbnailProvider
 from clip_finder_backend.types import ZeroShotClassifyRequest, ImageResponse
 from clip_finder_backend.zero_shot import do_zero_shot_classify
@@ -55,9 +56,7 @@ print("making thumbnail provider")
 
 progress_manager = ProgressManager()
 thumbnail_provider = ThumbnailProvider()
-tags_wrangler = TagsWrangler(
-    embedding_store.image_paths,
-    progress_callback=lambda p: progress_manager.update_task_progress_unified('Wrangling tags', p) )
+tags_wrangler = TagsWrangler(embedding_store.image_paths)
 
 print("making FastAPI")
 
@@ -112,32 +111,6 @@ class TaskResponse(BaseModel):
     task_id: str
     message: str
 
-async def perform_search_task(task_id: str, query: Query):
-    """Background task that performs the actual search and sends progress updates"""
-    try:
-        progress_manager.start_task(task_id, "Searching images...")
-
-        # Perform the actual search
-        def on_search_progress(progress: float, message: str=None):
-            progress_manager.update_task_progress(task_id, progress*100, message=message)
-        results = embedding_store.search_images(query=query, progress_callback=on_search_progress)
-
-        # Validate results as before
-        for r in results:
-            if r.path != embedding_store.get_image_path_for_id(r.id):
-                logging.warning(f"found image {r.path} doesn't match id {r.id} path {embedding_store.get_image_path_for_id(r.id)}")
-
-        # Convert to response format
-        search_results = [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
-                         for r in results]
-
-        progress_manager.complete_task(task_id, "Search completed", data=search_results)
-
-    except Exception as e:
-        traceback.print_exc()
-        logging.error(f"error during search: {repr(e)}")
-        progress_manager.fail_task(task_id, f"Search failed", error_details=repr(e))
-
 class SearchRequest(BaseModel):
     task_id: str
     query: Query
@@ -170,38 +143,16 @@ class ImagesByTagsInput(BaseModel):
     task_id: Optional[str] = None
 
 @app.post("/api/images/by-tags")
-async def get_images_by_tags(tags: ImagesByTagsInput, background_tasks: BackgroundTasks):
-    task_id = tags.task_id or str(f'tags-by-images-{uuid.uuid4()}')
-    background_tasks.add_task(perform_get_images_by_tags_task, task_id, tags.query)
+async def get_images_by_tags(input: ImagesByTagsInput, background_tasks: BackgroundTasks):
+    task_id = input.task_id or str(f'tags-by-images-{uuid.uuid4()}')
+    background_tasks.add_task(
+        perform_get_images_by_tags_task, task_id, input.tags,
+        progress_manager=progress_manager, embedding_store=embedding_store, tags_wrangler=tags_wrangler
+    )
     return TaskResponse(
         task_id=task_id,
         message="Images by tags fetch started. Use WebSocket to receive progress updates."
     )
-
-
-async def perform_get_images_by_tags_task(task_id: str, tags: ImagesByTagsInput):
-    """Background task that performs the actual images fetch and sends progress updates"""
-    try:
-        progress_manager.start_task(task_id, "Getting images by tags...")
-
-        # Perform the actual search
-        def on_get_images_progress(progress: float, message: str=None):
-            progress_manager.update_task_progress(task_id, progress*100, message=message)
-
-        image_paths = tags_wrangler.get_images_for_tags(tags.tags)
-        results = embedding_store.get_image_ids_for_paths(image_paths, progress_callback=on_get_images_progress)
-
-        # Convert to response format
-        search_results = [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
-                         for r in results]
-
-        progress_manager.complete_task(task_id, "Get images by tags complete", data=search_results)
-
-    except Exception as e:
-        traceback.print_exc()
-        logging.error(f"error during images by tags fetch: {repr(e)}")
-        progress_manager.fail_task(task_id, f"Get images by tags failed", error_details=repr(e))
-
 
 @app.post("/api/zero-shot-classify")
 async def zero_shot_classify(request: ZeroShotClassifyRequest):

@@ -2,7 +2,7 @@ import hashlib
 import os
 import uuid
 from dataclasses import dataclass, field
-from typing import Protocol, List, Literal, Callable
+from typing import Protocol, List, Literal, Callable, Optional
 
 import PIL
 import torch
@@ -59,7 +59,7 @@ class EmbeddingStore(Protocol):
     def get_text_embedding(self, text: str) -> torch.Tensor:
         ...
 
-    def search_images(self, query: Query, limit=100) -> List[QueryResult]:
+    def search_images(self, query: Query, limit=100, progress_callback: Optional[Callable[[float, str], None]]=None) -> List[QueryResult]:
         ...
 
     def has_image(self, path: str) -> bool:
@@ -82,6 +82,12 @@ class EmbeddingStore(Protocol):
                     continue
         self.add_images(images_to_add)
         return len(images_to_add)
+
+    def get_image_path_for_id(self, id: str):
+        ...
+
+    def get_image_ids_for_paths(self, image_paths: list[str]):
+        ...
 
 
 class ReadOnlyException(Exception):
