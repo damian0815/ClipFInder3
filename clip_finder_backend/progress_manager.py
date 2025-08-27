@@ -174,7 +174,7 @@ class ProgressManager:
         )
         self.send_progress_update(progress_msg)
 
-    def complete_task(self, task_id: str, message: str = "", data: Optional[List[Any]|Dict[str, Any]] = None):
+    def complete_task(self, task_id: str, message: str = "", data: Optional[List[Any]|Dict[str, Any]] = None, status: ProgressStatus = ProgressStatus.COMPLETED):
         """Convenience method to mark a task as completed"""
         progress_msg = ProgressMessage(
             task_id=task_id,
@@ -193,16 +193,12 @@ class ProgressManager:
 
         threading.Thread(target=cleanup, daemon=True).start()
 
-    def error_task(self, task_id: str, message: str = "", error_details: Optional[str] = None):
+    def fail_task(self, task_id: str, message: str = "", error_details: Optional[str] = None):
         """Convenience method to mark a task as errored"""
-        data = {"error_details": error_details} if error_details else None
-        progress_msg = ProgressMessage(
-            task_id=task_id,
+        self.complete_task(
+            task_id,
             status=ProgressStatus.ERROR,
-            message=message,
-            data=data
-        )
-        self.send_progress_update(progress_msg)
+            message=f'{message}\nError details: {error_details or ''}')
 
     def update_task_progress_unified(self, unique_label: str, progress_01: float):
         """

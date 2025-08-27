@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react";
+import {useState} from "react";
 import Image from "@/Components/Image.tsx";
 import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import EmbeddingInput from "@/Components/EmbeddingInput";
@@ -6,8 +6,8 @@ import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputDat
 import {FilterInput} from "@/Components/FilterInput.tsx";
 import {v4 as uuidv4} from 'uuid';
 import {getImageIdsForTags} from "@/api/tags";
-import {startSearch as startSearch, SearchParams} from "@/api/search";
-import {useProgressWebSocket} from "@/hooks/useProgressWebSocket";
+import {startSearchWithTaskId, SearchParams} from "@/api/search";
+import {useAsyncTask} from "@/hooks/useAsyncTask";
 
 
 type DistanceQueryProps = {
@@ -19,38 +19,16 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[]>([])
     const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
-    const [images, setImages] = useState<Image[]>([]);
-    const [queryInProgress, setQueryInProgress] = useState<boolean>(false);
-    const [currentSearchTaskId, setCurrentSearchTaskId] = useState<string | null>(null);
 
-    const { activeTasks } = useProgressWebSocket();
-
-    // Listen for search completion
-    useEffect(() => {
-
-        if (currentSearchTaskId && activeTasks.has(currentSearchTaskId)) {
-            const task = activeTasks.get(currentSearchTaskId)!;
-
-            if (task.status === 'completed' && task.data) {
-                console.log('Search completed:', task.data);
-                setImages(task.data);
-                setQueryInProgress(false);
-                setCurrentSearchTaskId(null);
-            } else if (task.status === 'failed') {
-                console.error('Search failed:', task.message);
-                setQueryInProgress(false);
-                setCurrentSearchTaskId(null);
-            }
-        }
-    }, [activeTasks, currentSearchTaskId]);
+    // Use the new async task hook instead of manual state management
+    const searchTask = useAsyncTask<Image[]>();
 
     const performSearch = async () => {
         if (embeddingInputs.length === 0) {
             console.log("can't perform search, no inputs")
         } else {
-            try {
-                setQueryInProgress(true);
-                
+            await searchTask.startTask(async (taskId) => {
+
                 // Build the search payload with weights
                 const textParts = embeddingInputs.filter(input => input.mode === 'text');
                 const imageParts = embeddingInputs.filter(input => input.mode === 'image');
@@ -86,17 +64,9 @@ function DistanceQuery(props: DistanceQueryProps) {
                 
                 console.log("query:", searchParams);
 
-                // Start the search task
-                const taskId = "search-" + uuidv4();
-                setCurrentSearchTaskId(taskId)
-                const taskData = await startSearch(searchParams, taskId);
-
-                console.log('Search started with task ID:', taskData.task_id);
-            } catch (error) {
-                console.error('Search error:', error);
-                setQueryInProgress(false);
-                setCurrentSearchTaskId(null);
-            }
+                // Start the search with the task ID
+                await startSearchWithTaskId(searchParams, taskId);
+            });
         }
     };
 
@@ -137,13 +107,16 @@ function DistanceQuery(props: DistanceQueryProps) {
             <button 
                 className={"btn btn-primary border rounded w-full mt-1"}
                 onClick={performSearch}
-                disabled={queryInProgress || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
+                disabled={searchTask.isLoading || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
             >
-                {queryInProgress ? 'Searching...' : 'Search'}
+                {searchTask.isLoading ? 'Searching...' : 'Search'}
             </button>
+            {searchTask.error && (
+                <div className="text-red-500 mt-2">Error: {searchTask.error}</div>
+            )}
         </div>
         <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
-        <ImageResultsGrid images={images} onSelect={props.setSelectedImages} onAddToQuery={handleAddToQuery} />
+        <ImageResultsGrid images={searchTask.data || []} onSelect={props.setSelectedImages} onAddToQuery={handleAddToQuery} />
     </>
 
 

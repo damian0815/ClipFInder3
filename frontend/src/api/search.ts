@@ -24,9 +24,44 @@ export interface SearchTaskResponse {
 }
 
 /**
+ * Starts a background search task with a client-generated task ID
+ * @param searchParams Search parameters including texts, images, tags, and filters
+ * @param taskId Client-generated task ID to track progress
+ * @returns Promise that resolves to search task information
+ */
+export async function startSearchWithTaskId(searchParams: SearchParams, taskId: string): Promise<SearchTaskResponse> {
+    console.log("starting search with task ID:", taskId, searchParams)
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/search`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                'query': searchParams,
+                'task_id': taskId,
+            }),
+        });
+
+        if (!response.ok) {
+            console.error("search failed: ", await response.json())
+            throw new Error(`HTTP error! status: ${response.status}, body: ${await response.text()}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error starting search:', error);
+        throw error;
+    }
+}
+
+/**
  * Starts a background search task
  * @param searchParams Search parameters including texts, images, tags, and filters
+ * @param taskId Procumputed task ID to track progress
  * @returns Promise that resolves to search task information
+ * @deprecated Use startSearchWithTaskId for better race condition handling
  */
 export async function startSearch(searchParams: SearchParams, taskId: string): Promise<SearchTaskResponse> {
     console.log("starting search: ", searchParams)

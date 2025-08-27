@@ -4,7 +4,7 @@ import traceback
 import threading
 import uuid
 import os
-from typing import List
+from typing import List, Optional
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -108,7 +108,7 @@ async def shutdown_event():
     logger.info("Application shutdown complete")
 
 
-class SearchTaskResponse(BaseModel):
+class TaskResponse(BaseModel):
     task_id: str
     message: str
 
@@ -136,13 +136,13 @@ async def perform_search_task(task_id: str, query: Query):
     except Exception as e:
         traceback.print_exc()
         logging.error(f"error during search: {repr(e)}")
-        progress_manager.fail_task(task_id, f"Search failed: {str(e)}")
+        progress_manager.fail_task(task_id, f"Search failed", error_details=repr(e))
 
 class SearchRequest(BaseModel):
     task_id: str
     query: Query
 
-@app.post("/api/search", response_model=SearchTaskResponse)
+@app.post("/api/search", response_model=TaskResponse)
 async def search_images(search_params: SearchRequest, background_tasks: BackgroundTasks):
     query = search_params.query
     task_id = search_params.task_id
@@ -151,7 +151,7 @@ async def search_images(search_params: SearchRequest, background_tasks: Backgrou
     # Add the search task to background tasks
     background_tasks.add_task(perform_search_task, task_id, query)
 
-    return SearchTaskResponse(
+    return TaskResponse(
         task_id=task_id,
         message="Search started. Use WebSocket to receive progress updates."
     )
@@ -167,11 +167,40 @@ async def serve_image(id: str):
 class ImagesByTagsInput(BaseModel):
     tags: List[str]
     match_all: bool = False
+    task_id: Optional[str] = None
 
 @app.post("/api/images/by-tags")
-async def serve_image(tags: ImagesByTagsInput):
-    image_paths = tags_wrangler.get_images_for_tags(tags.tags)
-    return embedding_store.get_image_ids_for_paths(image_paths)
+async def get_images_by_tags(tags: ImagesByTagsInput, background_tasks: BackgroundTasks):
+    task_id = tags.task_id or str(f'tags-by-images-{uuid.uuid4()}')
+    background_tasks.add_task(perform_get_images_by_tags_task, task_id, tags.query)
+    return TaskResponse(
+        task_id=task_id,
+        message="Images by tags fetch started. Use WebSocket to receive progress updates."
+    )
+
+
+async def perform_get_images_by_tags_task(task_id: str, tags: ImagesByTagsInput):
+    """Background task that performs the actual images fetch and sends progress updates"""
+    try:
+        progress_manager.start_task(task_id, "Getting images by tags...")
+
+        # Perform the actual search
+        def on_get_images_progress(progress: float, message: str=None):
+            progress_manager.update_task_progress(task_id, progress*100, message=message)
+
+        image_paths = tags_wrangler.get_images_for_tags(tags.tags)
+        results = embedding_store.get_image_ids_for_paths(image_paths, progress_callback=on_get_images_progress)
+
+        # Convert to response format
+        search_results = [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
+                         for r in results]
+
+        progress_manager.complete_task(task_id, "Get images by tags complete", data=search_results)
+
+    except Exception as e:
+        traceback.print_exc()
+        logging.error(f"error during images by tags fetch: {repr(e)}")
+        progress_manager.fail_task(task_id, f"Get images by tags failed", error_details=repr(e))
 
 
 @app.post("/api/zero-shot-classify")

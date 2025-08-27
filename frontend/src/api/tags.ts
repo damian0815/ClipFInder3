@@ -1,9 +1,52 @@
 import { API_BASE_URL } from "@/Constants.tsx";
 
+export interface TagsTaskResponse {
+    task_id: string;
+    message: string;
+}
+
+/**
+ * Starts a background task to fetch image IDs for tags
+ * @param tags Array of tag names to search for
+ * @param taskId Client-generated task ID to track progress
+ * @param matchAll Whether to require ALL tags (true) or ANY tags (false)
+ * @returns Promise that resolves to task information
+ */
+export async function getImageIdsForTagsAsync(tags: string[], taskId: string, matchAll: boolean = true): Promise<TagsTaskResponse> {
+    if (!tags || tags.length === 0) {
+        throw new Error("No tags provided");
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/images/by-tags`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tags: tags,
+                match_all: matchAll,
+                task_id: taskId
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}, body: ${await response.text()}`);
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error starting tags task:', error);
+        throw error;
+    }
+}
+
 /**
  * Fetches image IDs that have ALL of the specified tags
  * @param tags Array of tag names to search for
  * @returns Promise that resolves to an array of image IDs
+ * @deprecated Use getImageIdsForTagsAsync with useAsyncTask hook for better performance
  */
 export async function getImageIdsForTags(tags: string[]): Promise<string[]> {
     if (!tags || tags.length === 0) {
