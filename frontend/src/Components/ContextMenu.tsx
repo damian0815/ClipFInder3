@@ -1,4 +1,3 @@
-import { useEffect, useCallback, useState } from 'react';
 import { useContextMenu } from '@/hooks/useContextMenu';
 
 import styles from './ContextMenu.module.css';

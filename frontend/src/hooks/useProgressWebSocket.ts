@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { ProgressMessage } from '@/types/progress';
 
 const WEBSOCKET_URL = 'ws://localhost:8000/ws/progress';
@@ -15,113 +15,154 @@ type UseProgressWebSocketData = {
     clearActiveTasks: () => void;
 }
 
-export function useProgressWebSocket(): UseProgressWebSocketData {
-    const [messages, setMessages] = useState<ProgressMessage[]>([]);
-    const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
-    const [activeTasks, setActiveTasks] = useState<Map<string, ProgressMessage>>(new Map());
-    
-    const wsRef = useRef<WebSocket | null>(null);
-    const reconnectAttempts = useRef(0);
-    const reconnectTimeoutRef = useRef<number>();
+// Global singleton WebSocket connection state
+let globalWs: WebSocket | null = null;
+let globalConnectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error' = 'disconnected';
+let globalMessages: ProgressMessage[] = [];
+let globalActiveTasks: Map<string, ProgressMessage> = new Map();
+let globalListeners: Set<() => void> = new Set();
+let reconnectTimeout: number | undefined;
+let reconnectAttempts = 0;
 
-    const connect = () => {
-        try {
-            setConnectionStatus('connecting');
-            wsRef.current = new WebSocket(WEBSOCKET_URL);
+function notifyListeners() {
+    globalListeners.forEach(listener => listener());
+}
 
-            wsRef.current.onopen = () => {
-                //console.log('Progress WebSocket connected');
-                setConnectionStatus('connected');
-                reconnectAttempts.current = 0;
-            };
+function globalConnect() {
+    if (globalWs?.readyState === WebSocket.CONNECTING || globalWs?.readyState === WebSocket.OPEN) {
+        console.log('WebSocket already connecting/connected, skipping');
+        return;
+    }
 
-            wsRef.current.onmessage = (event) => {
-                try {
-                    const message: ProgressMessage = JSON.parse(event.data);
-                    //console.log('Progress update:', message);
-                    
-                    setMessages(prev => [...prev.slice(-99), message]); // Keep last 100 messages
-                    
-                    setActiveTasks(prev => {
-                        const newTasks = new Map(prev);
-                        
-                        if (message.status === 'completed' || message.status === 'failed') {
-                            // Remove completed/failed tasks after a delay
-                            setTimeout(() => {
-                                setActiveTasks(current => {
-                                    const updated = new Map(current);
-                                    updated.delete(message.task_id);
-                                    return updated;
-                                });
-                            }, 3000);
-                        }
-                        
-                        newTasks.set(message.task_id, message);
-                        return newTasks;
-                    });
-                } catch (error) {
-                    console.error('Error parsing progress message:', error);
-                }
-            };
+    try {
+        globalConnectionStatus = 'connecting';
+        notifyListeners();
 
-            wsRef.current.onclose = (event) => {
-                //console.log('Progress WebSocket disconnected:', event.code, event.reason);
-                setConnectionStatus('disconnected');
-                
-                if (!event.wasClean && reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-                    reconnectAttempts.current++;
-                    console.log(`Reconnecting... (${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS})`);
-                    
-                    reconnectTimeoutRef.current = setTimeout(() => {
-                        connect();
-                    }, RECONNECT_INTERVAL);
-                }
-            };
+        globalWs = new WebSocket(WEBSOCKET_URL);
 
-            wsRef.current.onerror = (error) => {
-                console.error('Progress WebSocket error:', error);
-                setConnectionStatus('error');
-            };
-
-        } catch (error) {
-            console.error('Error connecting to progress WebSocket:', error);
-            setConnectionStatus('error');
-        }
-    };
-
-    const disconnect = () => {
-        if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-        }
-        
-        if (wsRef.current) {
-            wsRef.current.close(1000, 'Component unmounting');
-        }
-    };
-
-    useEffect(() => {
-        connect();
-        
-        return () => {
-            disconnect();
+        globalWs.onopen = () => {
+            console.log('Progress WebSocket connected');
+            globalConnectionStatus = 'connected';
+            reconnectAttempts = 0;
+            notifyListeners();
         };
+
+        globalWs.onmessage = (event) => {
+            try {
+                const message: ProgressMessage = JSON.parse(event.data);
+                console.log('Progress update:', message);
+
+                globalMessages = [...globalMessages.slice(-99), message]; // Keep last 100 messages
+
+                if (message.status === 'completed' || message.status === 'failed') {
+                    // Remove completed/failed tasks after a delay
+                    setTimeout(() => {
+                        globalActiveTasks.delete(message.task_id);
+                        notifyListeners();
+                    }, 3000);
+                }
+
+                globalActiveTasks.set(message.task_id, message);
+                notifyListeners();
+            } catch (error) {
+                console.error('Error parsing progress message:', error);
+            }
+        };
+
+        globalWs.onclose = (event) => {
+            console.log('Progress WebSocket disconnected:', event.code, event.reason);
+            globalConnectionStatus = 'disconnected';
+            globalWs = null;
+            notifyListeners();
+
+            if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                console.log(`Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+
+                reconnectTimeout = setTimeout(() => {
+                    globalConnect();
+                }, RECONNECT_INTERVAL);
+            }
+        };
+
+        globalWs.onerror = (error) => {
+            console.error('Progress WebSocket error:', error);
+            globalConnectionStatus = 'error';
+            notifyListeners();
+        };
+
+    } catch (error) {
+        console.error('Error connecting to progress WebSocket:', error);
+        globalConnectionStatus = 'error';
+        notifyListeners();
+    }
+}
+
+function globalDisconnect() {
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = undefined;
+    }
+
+    if (globalWs) {
+        globalWs.close(1000, 'Component unmounting');
+        globalWs = null;
+    }
+
+    globalConnectionStatus = 'disconnected';
+    notifyListeners();
+}
+
+export function useProgressWebSocket(): UseProgressWebSocketData {
+    const [, forceUpdate] = useState({});
+    const listenerRef = useRef<() => void>();
+
+    // Force component re-render when global state changes
+    const triggerUpdate = useCallback(() => {
+        forceUpdate({});
     }, []);
 
-    const clearMessages = () => {
-        setMessages([]);
-    };
+    useEffect(() => {
+        // Register this component as a listener
+        listenerRef.current = triggerUpdate;
+        globalListeners.add(triggerUpdate);
 
-    const clearActiveTasks = () => {
-        setActiveTasks(new Map());
-    };
+        // Connect if not already connected
+        if (globalConnectionStatus === 'disconnected') {
+            globalConnect();
+        }
+
+        // Cleanup on unmount
+        return () => {
+            if (listenerRef.current) {
+                globalListeners.delete(listenerRef.current);
+            }
+
+            // Only disconnect if this is the last listener
+            if (globalListeners.size === 0) {
+                console.log('Last WebSocket listener unmounted, disconnecting');
+                globalDisconnect();
+            }
+        };
+    }, [triggerUpdate]);
+
+    const clearMessages = useCallback(() => {
+        globalMessages = [];
+        notifyListeners();
+    }, []);
+
+    const clearActiveTasks = useCallback(() => {
+        globalActiveTasks = new Map();
+        notifyListeners();
+    }, []);
 
     return {
-        messages,
-        connectionStatus,
-        activeTasks,
-        connect,
-        disconnect,
+        messages: globalMessages,
+        connectionStatus: globalConnectionStatus,
+        activeTasks: globalActiveTasks,
+        connect: globalConnect,
+        disconnect: globalDisconnect,
         clearMessages,
-        clearActiveTasks
+        clearActiveTasks,
     };
 }

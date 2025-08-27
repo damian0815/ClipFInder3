@@ -28,9 +28,6 @@ function Tag(props: TagProps) {
 
 type TagEditorSidebarProps = {
     images: Image[]
-    requestAddTag: (images: Image[], tagToAdd: string) => void;
-    requestDeleteTag: (images: Image[], tagToDelete: string) => void;
-
 }
 
 async function getTags(id: String) {

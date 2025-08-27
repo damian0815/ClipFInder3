@@ -1,4 +1,4 @@
-import { useProgressWebSocket } from '@/hooks/useProgressWebSocket';
+import { useProgressWebSocketContext } from '@/contexts/ProgressWebSocketContext';
 import { ProgressMessage } from '@/types/progress';
 
 interface ProgressBarProps {
@@ -82,7 +82,7 @@ interface ProgressStatusBarProps {
 }
 
 export function ProgressStatusBar({ className = '', maxVisible = 5 }: ProgressStatusBarProps) {
-    const { activeTasks, connectionStatus, clearActiveTasks } = useProgressWebSocket();
+    const { activeTasks, connectionStatus, clearActiveTasks } = useProgressWebSocketContext();
 
     /*if (activeTasks.length === 0 && connectionStatus === 'connected') {
         return null; // Don't show anything when no active tasks

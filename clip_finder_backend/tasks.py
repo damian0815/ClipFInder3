@@ -38,6 +38,7 @@ async def perform_search_task(task_id: str, query: Query, progress_manager: Prog
 async def perform_get_images_by_tags_task(task_id: str, tags: list[str], progress_manager: ProgressManager, embedding_store: EmbeddingStore, tags_wrangler: TagsWrangler):
     """Background task that performs the actual images fetch and sends progress updates"""
     try:
+        print("starting get images by tags task")
         progress_manager.start_task(task_id, "Getting images by tags...")
 
         # Perform the actual search
@@ -48,6 +49,7 @@ async def perform_get_images_by_tags_task(task_id: str, tags: list[str], progres
         image_ids = embedding_store.get_image_ids_for_paths(image_paths)
 
         progress_manager.complete_task(task_id, "Get images by tags complete", data=image_ids)
+        print("finished get images by tags task")
 
     except Exception as e:
         traceback.print_exc()

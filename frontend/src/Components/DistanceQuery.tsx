@@ -6,7 +6,7 @@ import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputDat
 import {FilterInput} from "@/Components/FilterInput.tsx";
 import {v4 as uuidv4} from 'uuid';
 import {startSearchWithTaskId, SearchParams} from "@/api/search";
-import {useAsyncTask} from "@/hooks/useAsyncTask";
+import {useAsyncTaskManager} from "@/hooks/useAsyncTaskManager";
 import {getImageIdsForTagsAsync} from "@/api";
 
 
@@ -19,15 +19,20 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[]>([])
     const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
+    
+    // Search state variables
+    const [resultImages, setResultImages] = useState<Image[]>([]);
+    const [searchError, setSearchError] = useState<string | null>(null);
+    const [searchIsRunning, setSearchIsRunning] = useState(false);
 
-    // Use the new async task hook instead of manual state management
-    const searchTask = useAsyncTask<Image[]>();
-    const tagFetchTask = useAsyncTask<string[]>();
+    // Use the async task manager for all tasks
+    const taskManager = useAsyncTaskManager();
 
     const cancelSearch = () => {
-        if (searchTask.isLoading && searchTask.taskId) {
-            console.log("cancelling search task:", searchTask.taskId);
-            searchTask.reset();
+        if (searchIsRunning) {
+            console.log("cancelling search task");
+            setSearchIsRunning(false);
+            setSearchError("Search cancelled");
         }
     };
 
@@ -40,65 +45,111 @@ function DistanceQuery(props: DistanceQueryProps) {
             var requiredImageIds: string[]|undefined = undefined
             // tag filtering
             if ((filterInput.negativeTags ?? "").trim().length > 0) {
-                const taskResult = await tagFetchTask.runTask(async (taskId) => {
+                const taskResult = await taskManager.runTask(async (taskId, taskData) => {
+                    console.log("running negative tags task, id=", taskId)
                     const negativeTags = filterInput.negativeTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
                     await getImageIdsForTagsAsync(negativeTags, taskId, true);
-                    console.log("tagFetchTask:", tagFetchTask)
-                    while (tagFetchTask.isLoading || tagFetchTask.data === undefined) {
-                        console.log('waiting for tag fetch task to complete...')
+                    console.log("taskData:", taskData)
+                    while (taskData.isLoading || taskData.data === undefined) {
+                        //console.log('waiting for tag fetch task (negative tags) to complete...')
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
-                    console.log("completed tagFetchTask:", tagFetchTask, tagFetchTask.data)
-                    return [...tagFetchTask.data ?? []]
+                    console.log("completed task:", taskData, taskData.data)
+                    return taskData.data ?? []
                 });
                 console.log("taskResult:", taskResult)
-                excludedImageIds = taskResult
+                if (taskResult.error) {
+                    console.error("Error fetching negative tags:", taskResult.error);
+                    return;
+                }
+                excludedImageIds = taskResult.data as string[]
                 console.log("excluded images:", excludedImageIds)
             }
             if ((filterInput.positiveTags ?? "").trim().length > 0) {
-                requiredImageIds = await tagFetchTask.runTask(async (taskId) => {
+                const taskResult = await taskManager.runTask(async (taskId, taskData) => {
                     const positiveTags = filterInput.positiveTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
                     await getImageIdsForTagsAsync(positiveTags, taskId, true);
-                    while (tagFetchTask.isLoading || tagFetchTask.data === undefined) {
-                        console.log('waiting for tag fetch task to complete...')
+                    console.log("taskData:", taskData)
+                    while (taskData.isLoading || taskData.data === undefined) {
+                        //console.log('waiting for tag fetch task (positive tags) to complete...')
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
-                    return [...tagFetchTask.data ?? []]
+                    console.log("completed task:", taskData, taskData.data)
+                    return taskData.data ?? []
                 });
+                if (taskResult.error) {
+                    console.error("Error fetching positive tags:", taskResult.error);
+                    return;
+                }
+                requiredImageIds = taskResult.data as string[]
                 console.log("required images:", requiredImageIds)
             }
 
 
-            await searchTask.runTask(async (taskId) => {
+            setSearchIsRunning(true);
+            setSearchError(null);
+            setResultImages([]);
+            
+            try {
+                const searchResult = await taskManager.runTask(async (taskId, taskData) => {
+                    // Build the search payload with weights
+                    const textParts = embeddingInputs.filter(input => input.mode === 'text');
+                    const imageParts = embeddingInputs.filter(input => input.mode === 'image');
+                    const tagParts = embeddingInputs.filter(input => input.mode === 'tags');
+                    const weights = textParts.map(input => input.weight).concat(
+                        imageParts.map(input => input.weight), 
+                        tagParts.map(input => input.weight));
+                    
+                    let searchParams: SearchParams = {
+                        texts: textParts.map(input => input.text).filter(Boolean) as string[],
+                        image_ids: imageParts.map(input => input.imageId).filter(Boolean) as string[],
+                        tags: tagParts.map(input => input.tags).filter(Boolean) as string[][],
+                        weights: weights,
+                        path_contains: undefined,
+                        excluded_image_ids: excludedImageIds,
+                        required_image_ids: requiredImageIds,
+                    };
 
-                // Build the search payload with weights
-                const textParts = embeddingInputs.filter(input => input.mode === 'text');
-                const imageParts = embeddingInputs.filter(input => input.mode === 'image');
-                const tagParts = embeddingInputs.filter(input => input.mode === 'tags');
-                const weights = textParts.map(input => input.weight).concat(
-                    imageParts.map(input => input.weight), 
-                    tagParts.map(input => input.weight));
+                    console.log("filters:", filterInput.pathContains, filterInput.positiveTags, filterInput.negativeTags)
+                    if ((filterInput.pathContains ?? "").trim().length > 0) {
+                        searchParams.path_contains = filterInput.pathContains!;
+                    }
+                    
+                    console.log("query:", searchParams);
+
+                    console.log("starting search, searIsRunning is", searchIsRunning)
+
+                    // Start the search with the task ID
+                    await startSearchWithTaskId(searchParams, taskId);
+                    
+                    console.log("started search, searIsRunning is", searchIsRunning)
+
+                    // Wait for the search to complete and get results from taskData
+                    while (taskData.isLoading || taskData.data === undefined) {
+                        console.log("waiting for completion, searIsRunning is", searchIsRunning)
+                        // Check if search was cancelled
+                        if (!searchIsRunning) {
+                            throw new Error("Search cancelled");
+                        }
+                        console.log('waiting for search task to complete...')
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    
+                    return taskData.data || [];
+                });
+
+                console.log("setSearchIsRunning false. searchResult:", searchResult);
+                setSearchIsRunning(false);
                 
-                let searchParams: SearchParams = {
-                    texts: textParts.map(input => input.text).filter(Boolean) as string[],
-                    image_ids: imageParts.map(input => input.imageId).filter(Boolean) as string[],
-                    tags: tagParts.map(input => input.tags).filter(Boolean) as string[][],
-                    weights: weights,
-                    path_contains: undefined,
-                    excluded_image_ids: excludedImageIds,
-                    required_image_ids: requiredImageIds,
-                };
-
-                console.log("filters:", filterInput.pathContains, filterInput.positiveTags, filterInput.negativeTags)
-                if ((filterInput.pathContains ?? "").trim().length > 0) {
-                    searchParams.path_contains = filterInput.pathContains!;
+                if (searchResult.error) {
+                    setSearchError(searchResult.error);
+                } else {
+                    setResultImages(searchResult.data as Image[]);
                 }
-                
-                console.log("query:", searchParams);
-
-                // Start the search with the task ID
-                await startSearchWithTaskId(searchParams, taskId);
-            });
+            } catch (error) {
+                setSearchIsRunning(false);
+                setSearchError(error instanceof Error ? error.message : 'Search failed');
+            }
         }
     };
 
@@ -141,21 +192,21 @@ function DistanceQuery(props: DistanceQueryProps) {
                 <button
                     className={"btn btn-primary border rounded w-1/3 h-10 mt-1"}
                     onClick={performSearch}
-                    disabled={searchTask.isLoading || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
+                    disabled={searchIsRunning || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
                 >
-                    {searchTask.isLoading ? 'Searching...' : `Search (${embeddingInputs.filter(input => input.value).length} non-empty inputs)`}
+                    {searchIsRunning ? 'Searching...' : `Search (${embeddingInputs.filter(input => input.value).length} non-empty inputs)`}
                 </button>
                 <button
                     className={"btn btn-primary border rounded w-1/3 h-10 mt-1"}
                     onClick={cancelSearch}
-                    disabled={!searchTask.isLoading}
+                    disabled={!searchIsRunning}
                 >Cancel search</button>
             </div>
-            {searchTask.error && (
-                <div className="text-red-500 mt-2">Error: {searchTask.error}</div>
+            {searchError && (
+                <div className="text-red-500 mt-2">Error: {searchError}</div>
             )}
         </div>
-        <ImageResultsGrid images={searchTask.data || []} onSelect={props.setSelectedImages} onAddToQuery={handleAddToQuery} />
+        <ImageResultsGrid images={resultImages} onSelect={props.setSelectedImages} onAddToQuery={handleAddToQuery} />
     </>
 
 
