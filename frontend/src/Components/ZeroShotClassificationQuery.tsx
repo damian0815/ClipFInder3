@@ -5,10 +5,10 @@ import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import {useEffect, useState} from "react";
 import {API_BASE_URL} from "@/Constants.tsx";
 import MultiColumn from "@/Components/MultiColumn.tsx";
-import Image from "@/Components/Image.tsx";
+import Image from "@/types/image";
 import {FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import {FilterInput} from "@/Components/FilterInput.tsx";
-import ImageResults2D from "@/Components/ImageResults2D.tsx";
+import { i } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
 
 type ZeroShotClassificationQueryProps = {
     setSelectedImages: (images: Image[]) => void;
@@ -107,6 +107,10 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         console.log("all selected images:", allSelectedImages);
     }
 
+    function handleAddToQuery(i: Image): void {
+        throw new Error("Function not implemented.");
+    }
+
     return <>
         <ZeroShotClassificationInput initialQuery={getLastQuery()} setQuery={setQueryInput}/>
         <FilterInput initialFilterInput={getLastFilter()} setFilterInput={setFilterInput} />
@@ -123,9 +127,13 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
                         //return <div>{JSON.stringify(thisClsResults)}</div>
                         thisClsResults.sort((a, b) => a.entropy - b.entropy);
                         const thisClsImages = thisClsResults.map((qr) => qr.image)
+
                         return <>
                          <pre>{clsId}</pre>
-                        <ImageResultsGrid images={thisClsImages} onSelect={(si) => selectedImagesUpdated(clsId, si)} />
+                        <ImageResultsGrid 
+                            images={thisClsImages} 
+                            onAddToQuery={(i) => handleAddToQuery(i)}
+                            onSelect={(si) => selectedImagesUpdated(clsId, si)} />
                         </>
                     })}
                 </MultiColumn>

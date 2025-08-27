@@ -2,7 +2,7 @@ import {useEffect, useState} from "react";
 import DebouncedTextField from "@/Components/DebouncedTextField.tsx";
 import {EmbeddingInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import useTraceUpdate from "@/Components/TraceUpdate.tsx";
-import { CorpusImage } from "./Image";
+import { CorpusImage } from "./ResultImage";
 import InputNumber from 'react-input-number';
 
 

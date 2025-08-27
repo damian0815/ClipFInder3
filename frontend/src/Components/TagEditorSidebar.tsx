@@ -1,4 +1,4 @@
-import Image from "@/Components/Image.tsx";
+import Image from "@/types/image";
 import {useEffect, useState} from "react";
 import {API_BASE_URL} from "@/Constants.tsx";
 import {TagTextInput} from "@/Components/TagTextInput.tsx";

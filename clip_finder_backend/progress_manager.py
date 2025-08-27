@@ -82,7 +82,7 @@ class ProgressManager:
                 websocket.send_text(json.dumps(message_dict)),
                 loop
             )
-            print("ProgressManager _send_to_connection sent", message)
+            #print("ProgressManager _send_to_connection sent", message)
         except Exception as e:
             logger.error(f"Error sending message to WebSocket: {e}")
             # Remove the connection if it's broken
@@ -90,7 +90,7 @@ class ProgressManager:
 
     def _broadcast_message(self, message: ProgressMessage):
         """Broadcast a message to all connected WebSocket clients"""
-        print(f"ProgressManager about to broadcast. num_connections: {self.connections}", message)
+        #rint(f"ProgressManager about to broadcast. num_connections: {self.connections}", message)
         if not self.connections:
             return
 
@@ -99,7 +99,7 @@ class ProgressManager:
 
         for websocket, loop in connections_copy:
             self._send_to_connection(websocket, message, loop)
-        print("ProgressManager broadcast done", message)
+        #print("ProgressManager broadcast done", message)
 
     def send_progress_update(self, message: ProgressMessage):
         """

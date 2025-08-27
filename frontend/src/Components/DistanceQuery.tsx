@@ -1,5 +1,5 @@
 import {useState, useRef, useCallback, useEffect} from "react";
-import Image from "@/Components/Image.tsx";
+import Image from "@/types/image";
 import ImageResultsGrid from "@/Components/ImageResultsGrid.tsx";
 import EmbeddingInput from "@/Components/EmbeddingInput";
 import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
@@ -7,7 +7,7 @@ import {FilterInput} from "@/Components/FilterInput.tsx";
 import {v4 as uuidv4} from 'uuid';
 import {startSearchWithTaskId, SearchParams} from "@/api/search";
 import {useAsyncTaskManager} from "@/hooks/useAsyncTaskManager";
-import {getImageIdsForTagsAsync} from "@/api";
+import {getImageIdsForTagsAsync as startGetImageIdsForTagsAsync} from "@/api";
 
 
 type DistanceQueryProps = {
@@ -29,11 +29,8 @@ function DistanceQuery(props: DistanceQueryProps) {
     // Infinite scroll state
     const [currentOffset, setCurrentOffset] = useState(0);
     const [hasMoreResults, setHasMoreResults] = useState(true);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     // Store filter state to preserve for pagination
-    const [currentExcludedImageIds, setCurrentExcludedImageIds] = useState<string[] | undefined>(undefined);
-    const [currentRequiredImageIds, setCurrentRequiredImageIds] = useState<string[] | undefined>(undefined);
     const [currentSearchParams, setCurrentSearchParams] = useState<SearchParams | null>(null);
 
     // Use ref to track cancellation state to avoid closure issues
@@ -52,57 +49,57 @@ function DistanceQuery(props: DistanceQueryProps) {
     };
 
     // Function to perform search for a specific page
-    const performSearchPage = async (offset: number, append: boolean = false): Promise<Image[]> => {
-        const searchParams: SearchParams = currentSearchParams || {
-            texts: embeddingInputs.filter(input => input.mode === 'text').map(input => input.text).filter(Boolean) as string[],
-            image_ids: embeddingInputs.filter(input => input.mode === 'image').map(input => input.imageId).filter(Boolean) as string[],
-            tags: embeddingInputs.filter(input => input.mode === 'tags').map(input => input.tags).filter(Boolean) as string[][],
-            weights: embeddingInputs.map(input => input.weight),
-            path_contains: (filterInput.pathContains ?? "").trim().length > 0 ? filterInput.pathContains : undefined,
-            excluded_image_ids: currentExcludedImageIds,
-            required_image_ids: currentRequiredImageIds,
-            offset: offset,
-            limit: pageSize // Smaller page size for better UX
-        };
+    const performSearchPage = async (
+        offset: number, 
+        searchParams: SearchParams,
+        append: boolean = false): Promise<Image[]> => {
 
-        const searchResult = await taskManager.runTask(async (taskId, taskData) => {
-            console.log(`Starting search with offset ${offset}, taskId:`, taskId);
+        try {
+            setSearchIsRunning(true)
 
-            // Start the search with the task ID
-            searchParams.offset = offset;
-            await startSearchWithTaskId(searchParams, taskId);
+            const searchResult = await taskManager.runTask(async (taskId, taskData) => {
+                console.log(`Starting search with offset ${offset}, taskId:`, taskId);
 
-            // Wait for the search to complete and get results from taskData
-            while (taskData.isLoading || taskData.data === undefined) {
-                // Check if search was cancelled using ref instead of state
-                if (searchCancelledRef.current) {
-                    throw new Error("Search cancelled");
+                // Start the search with the task ID
+                await startSearchWithTaskId(searchParams, taskId);
+
+                // Wait for the search to complete and get results from taskData
+                while (taskData.data === undefined) {
+                    // Check if search was cancelled using ref instead of state
+                    if (searchCancelledRef.current) {
+                        throw new Error("Search cancelled");
+                    }
+                    console.log(`Waiting for search with offset ${offset} to complete...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                console.log(`Waiting for search with offset ${offset} to complete...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                return taskData.data;
+            });
+
+            if (searchResult.error) {
+                throw new Error(searchResult.error);
             }
 
-            return taskData.data;
-        });
+            const newImages = searchResult.data as Image[];
+            if (!newImages) {
+                console.error("newImages is undefined. searchResult:", searchResult);
+            }
 
-        if (searchResult.error) {
-            throw new Error(searchResult.error);
+            // Check if we have more results (if we got a full page, there might be more)
+            const gotFullPage = newImages.length === (searchParams.limit || pageSize);
+            if (!append) {
+                setHasMoreResults(gotFullPage);
+            } else {
+                setHasMoreResults(gotFullPage);
+            }
+
+            return newImages;
+        } finally {
+            setSearchIsRunning(false);
         }
-
-        const newImages = searchResult.data as Image[];
-
-        // Check if we have more results (if we got a full page, there might be more)
-        const gotFullPage = newImages.length === (searchParams.limit || pageSize);
-        if (!append) {
-            setHasMoreResults(gotFullPage);
-        } else {
-            setHasMoreResults(gotFullPage);
-        }
-
-        return newImages;
     };
 
-    const performSearch = async () => {
+    const performPage0Search = async () => {
         if (embeddingInputs.length === 0) {
             console.log("can't perform search, no inputs")
             return;
@@ -128,8 +125,8 @@ function DistanceQuery(props: DistanceQueryProps) {
                 const taskResult = await taskManager.runTask(async (taskId, taskData) => {
                     console.log("running negative tags task, id=", taskId)
                     const negativeTags = filterInput.negativeTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
-                    await getImageIdsForTagsAsync(negativeTags, taskId, true);
-                    while (taskData.isLoading || taskData.data === undefined) {
+                    await startGetImageIdsForTagsAsync(negativeTags, taskId, true);
+                    while (taskData.data === undefined) {
                         if (searchCancelledRef.current) {
                             throw new Error("Search cancelled");
                         }
@@ -147,8 +144,8 @@ function DistanceQuery(props: DistanceQueryProps) {
             if ((filterInput.positiveTags ?? "").trim().length > 0) {
                 const taskResult = await taskManager.runTask(async (taskId, taskData) => {
                     const positiveTags = filterInput.positiveTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
-                    await getImageIdsForTagsAsync(positiveTags, taskId, true);
-                    while (taskData.isLoading || taskData.data === undefined) {
+                    await startGetImageIdsForTagsAsync(positiveTags, taskId, true);
+                    while (taskData.data === undefined) {
                         if (searchCancelledRef.current) {
                             throw new Error("Search cancelled");
                         }
@@ -163,17 +160,14 @@ function DistanceQuery(props: DistanceQueryProps) {
                 requiredImageIds = taskResult.data as string[]
             }
 
-            // Store filter state for pagination
-            setCurrentExcludedImageIds(excludedImageIds);
-            setCurrentRequiredImageIds(requiredImageIds);
-
             // Build and store search params for pagination
             const searchParams: SearchParams = {
                 texts: embeddingInputs.filter(input => input.mode === 'text').map(input => input.text).filter(Boolean) as string[],
                 image_ids: embeddingInputs.filter(input => input.mode === 'image').map(input => input.imageId).filter(Boolean) as string[],
                 tags: embeddingInputs.filter(input => input.mode === 'tags').map(input => input.tags).filter(Boolean) as string[][],
                 weights: embeddingInputs.map(input => input.weight),
-                path_contains: (filterInput.pathContains ?? "").trim().length > 0 ? filterInput.pathContains : undefined,
+                required_path_contains: filterInput.positivePathContains,
+                excluded_path_contains: filterInput.negativePathContains,
                 excluded_image_ids: excludedImageIds,
                 required_image_ids: requiredImageIds,
                 offset: 0,
@@ -182,7 +176,7 @@ function DistanceQuery(props: DistanceQueryProps) {
             setCurrentSearchParams(searchParams);
 
             // Perform initial search (page 0)
-            const initialResults = await performSearchPage(0, false);
+            const initialResults = await performSearchPage(0, searchParams, false);
             setResultImages(initialResults);
             setSearchIsRunning(false);
 
@@ -194,25 +188,24 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     // Function to load more results
     const loadMoreResults = useCallback(async () => {
-        if (!hasMoreResults || isLoadingMore || !currentSearchParams) {
+        if (!hasMoreResults || searchIsRunning || !currentSearchParams) {
             return;
         }
 
-        setIsLoadingMore(true);
         try {
-            const nextOffset = currentOffset + pageSize;
-            const moreResults = await performSearchPage(nextOffset, true);
+            const nextOffset = (currentSearchParams.offset ?? 0) + pageSize;
+            currentSearchParams.offset = nextOffset;
+            const moreResults = await performSearchPage(nextOffset, currentSearchParams, true);
+            const moreResultsFiltered = [...moreResults].filter(image => !resultImages.some(existing => existing.id === image.id));
 
-            setResultImages(prev => [...prev, ...moreResults]); //.filter(image => !prev.some(existing => existing.id === image.id))]);
+            setResultImages(prev => [...prev, ...moreResultsFiltered]);
             setCurrentOffset(nextOffset);
 
         } catch (error) {
             console.error('Error loading more results:', error);
             setSearchError(error instanceof Error ? error.message : 'Failed to load more results');
-        } finally {
-            setIsLoadingMore(false);
         }
-    }, [currentOffset, hasMoreResults, isLoadingMore, currentSearchParams]);
+    }, [currentOffset, hasMoreResults, searchIsRunning, currentSearchParams]);
 
     useEffect(() => {
         // Attach scroll event listener for infinite scroll
@@ -249,7 +242,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                         <EmbeddingInput 
                             embeddingInput={input} 
                             onDeleteClicked={(_) => handleDeleteEmbeddingInput(input.id)}
-                            onQueryRequested={performSearch} />
+                            onQueryRequested={performPage0Search} />
                     </div>
                 ))}
                 <div className={'w-40 flex-shrink-0 border inline-block'}>
@@ -267,7 +260,7 @@ function DistanceQuery(props: DistanceQueryProps) {
             <div className={"w-full flex flex-row justify-around"}>
                 <button
                     className={"btn btn-primary border rounded w-1/3 h-10 mt-1"}
-                    onClick={performSearch}
+                    onClick={performPage0Search}
                     disabled={searchIsRunning || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
                 >
                     {searchIsRunning ? 'Searching...' : `Search (${embeddingInputs.filter(input => input.value).length} non-empty inputs)`}
@@ -282,13 +275,14 @@ function DistanceQuery(props: DistanceQueryProps) {
                 <div className="text-red-500 mt-2">Error: {searchError}</div>
             )}
         </div>
+        <div>Current offset: {currentSearchParams?.offset ?? "<undefined>"}</div>
         <ImageResultsGrid
             images={resultImages}
             onSelect={props.setSelectedImages}
             onAddToQuery={handleAddToQuery}
-            hasMoreResults={hasMoreResults}
+            //hasMoreResults={hasMoreResults}
         />
-        {isLoadingMore && (
+        {searchIsRunning && (
             <div className="text-center py-4">
                 <div className="text-gray-600">Loading more results...</div>
             </div>

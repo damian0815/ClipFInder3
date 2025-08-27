@@ -23,7 +23,8 @@ class Query(BaseModel):
     weights: List[float]
 
     reduce_method: Literal['sum', 'max'] = 'sum'
-    path_contains: str = None
+    required_path_contains: str = None
+    excluded_path_contains: str = None
     required_image_ids: List[str] | None = None
     excluded_image_ids: List[str] | None = None
 
@@ -118,11 +119,11 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
                 print('loaded', len(self.image_paths), 'image embeddings from', store_file)
             else:
                 self.text_embeddings = torch.empty([0, clip_model.embedding_dim]).to(self.store_device)
-                self.texts = []
+                self.texts: List[str] = []
                 self.image_embeddings = torch.empty([0, clip_model.embedding_dim]).to(self.store_device)
-                self.image_paths = []
-                self.image_ids = []
-                self.image_hashes = []
+                self.image_paths: List[str] = []
+                self.image_ids: List[str] = []
+                self.image_hashes: List[str] = []
 
     @property
     def is_readonly(self) -> bool:
@@ -149,7 +150,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
     def cleanup_missing_files(self, force=False):
         have_indices = [i for i, p in enumerate(tqdm(self.image_paths)) if os.path.exists(p)]
         if len(have_indices) < len(self.image_paths)*0.75 and not force:
-            raise RuntimeError("cleanup_missing_files() would remove", len(missing_indices), "out of", len(self.image_paths),
+            raise RuntimeError("cleanup_missing_files() would remove", len(self.image_paths) - len(have_indices), "out of", len(self.image_paths),
                   "images, but this is more than 25% of the dataset. Refusing to proceed with force=True")
         if len(have_indices) < len(self.image_paths):
             print(f'removing {len(self.image_paths) - len(have_indices)} embeddings from store because files are missing')
@@ -261,8 +262,11 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
                 filtered_corpus_paths = set(self.image_paths)
             filtered_corpus_paths.difference_update(set(paths))
 
-        if query.path_contains:
-            matching_corpus_paths = [p for p in self.image_paths if query.path_contains in p]
+        if query.required_path_contains:
+            matching_corpus_paths = [p for p in self.image_paths if query.required_path_contains in p]
+            intersect_corpus_paths(matching_corpus_paths)
+        if query.excluded_path_contains:
+            matching_corpus_paths = [p for p in self.image_paths if query.excluded_path_contains not in p]
             intersect_corpus_paths(matching_corpus_paths)
 
         if query.required_image_ids:

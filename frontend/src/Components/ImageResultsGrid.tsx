@@ -1,5 +1,6 @@
 import {useEffect, useState} from "react";
-import Image, {ResultImage} from "@/Components/Image.tsx";
+import Image from "@/types/image";
+import { ResultImage } from "@/Components/ResultImage";
 import Selectable from 'react-selectable-box';
 import { API_BASE_URL } from "@/Constants";
 

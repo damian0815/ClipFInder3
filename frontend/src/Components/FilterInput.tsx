@@ -7,27 +7,39 @@ type FilterInputProps = {
 }
 
 export function FilterInput(props: FilterInputProps) {
-    const [pathContains, setPathContains] = useState<string|undefined>(props.initialFilterInput.pathContains)
+    const [negativePathContains, setNegativePathContains] = useState<string|undefined>(props.initialFilterInput.positivePathContains)
+    const [positivePathContains, setPositivePathContains] = useState<string|undefined>(props.initialFilterInput.positivePathContains)
     const [negativeTags, setNegativeTags] = useState<string|undefined>(props.initialFilterInput.negativeTags)
     const [positiveTags, setPositiveTags] = useState<string|undefined>(props.initialFilterInput.positiveTags)
 
     useEffect(() => {
         const data = new FilterInputData()
-        data.pathContains = pathContains
+        data.positivePathContains = positivePathContains
+        data.negativePathContains = negativePathContains
         data.negativeTags = negativeTags
         data.positiveTags = positiveTags
         props.setFilterInput(data)
-    }, [pathContains, negativeTags, positiveTags])
+    }, [negativePathContains, positivePathContains, negativeTags, positiveTags])
 
     return <>
-        <div className={"p-1 w-full grid grid-cols-3 gap-2"}>
+        <div className={"p-1 w-full grid grid-cols-4 gap-2"}>
             <label>
-                Path contains
+                Required path (partial)
                 <input
                     type="text"
                     placeholder="Path contains"
-                    value={pathContains}
-                    onChange={(e) => setPathContains(e.target.value)}
+                    value={positivePathContains}
+                    onChange={(e) => setPositivePathContains(e.target.value)}
+                    className="border rounded-lg p-1 w-full"
+                />
+            </label>
+            <label>
+                Excluded path (partial)
+                <input
+                    type="text"
+                    placeholder="Not path contains"
+                    value={negativePathContains}
+                    onChange={(e) => setNegativePathContains(e.target.value)}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>

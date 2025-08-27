@@ -1,4 +1,5 @@
-import Image, {ResultImage} from "@/Components/Image.tsx";
+import Image from "@/types/image";
+import { ResultImage } from "@/Components/ResultImage";
 import {
     TransformWrapper,
     TransformComponent,

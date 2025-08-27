@@ -2,25 +2,16 @@ import {API_BASE_URL} from "@/Constants.tsx";
 import {useState} from "react";
 import {useSelectable} from "react-selectable-box";
 import * as ContextMenu from "@radix-ui/react-context-menu";
-//import { ContextMenu } from "radix-ui";
-
-export default interface Image {
-  id: string;
-  path: string;
-  distance: number|undefined
-  tags: string[]|undefined
-  order_key: number|number[]|undefined
-}
+import Image from "@/types/image";
 
 export type ResultImageProps = {
-  image: Image
-  onClick: (event: React.MouseEvent, image: Image) => void
-  onAddToQuery: (img: Image) => void
-  onRevealInFinder: (img: Image) => void
-  isSelected: boolean
-  className?: string
-}
-
+  image: Image;
+  onClick: (event: React.MouseEvent, image: Image) => void;
+  onAddToQuery: (img: Image) => void;
+  onRevealInFinder: (img: Image) => void;
+  isSelected: boolean;
+  className?: string;
+};
 
 export function ResultImage(props: ResultImageProps) {
     const { setNodeRef, isSelected, isAdding, isRemoving } = useSelectable({

@@ -3,11 +3,11 @@ import {API_BASE_URL} from "@/Constants.tsx";
 export interface SearchParams {
     texts?: string[];
     image_ids?: string[];
-    tags?: string[][];
     weights?: number[];
-    path_contains?: string;
-    excluded_image_ids?: string[];
+    required_path_contains?: string;
+    excluded_path_contains?: string;
     required_image_ids?: string[];
+    excluded_image_ids?: string[];
     // Pagination parameters
     offset?: number;
     limit?: number;

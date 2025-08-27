@@ -14,7 +14,7 @@ class TagsWrangler:
     def __init__(self, all_paths: list[str]):
         self.known_tags = _load_known_tags()
         self.all_paths = all_paths
-        self.tag_to_image_cache = None
+        self.tag_to_image_cache: Optional[dict[str, list[str]]] = None
 
     def get_all_known_tags(self):
         return self.known_tags
@@ -40,11 +40,17 @@ class TagsWrangler:
         if any(tag.name == tag_name for tag in md.tags):
             return False
         md.tags = md.tags + [Tag(name=tag_name, color=FINDER_COLOR_NONE)]
+        if self.tag_to_image_cache is not None:
+            self.tag_to_image_cache[image_path] = [t.name for t in md.tags]
         return True
+
 
     def remove_tag(self, image_path, tag_name):
         md = OSXMetaData(image_path)
         md.tags = [t for t in md.tags if t.name != tag_name]
+        if self.tag_to_image_cache is not None:
+            self.tag_to_image_cache[image_path] = [t.name for t in md.tags]
+
 
     def _populate_tag_to_image_cache(self, progress_callback: Optional[Callable[[float], None]] = None):
         self.tag_to_image_cache = {}

@@ -7,11 +7,12 @@ import PopulateDatabase from "@/Components/PopulateDatabase.tsx";
 import Collapsible from "react-collapsible";
 import DistanceQuery from "@/Components/DistanceQuery.tsx";
 import ZeroShotClassificationQuery from "@/Components/ZeroShotClassificationQuery.tsx";
-import Image from "@/Components/Image.tsx";
+import Image from "@/types/image";
 import {useState} from "react";
 import {TagEditorSidebar} from "@/Components/TagEditorSidebar.tsx";
 import ProgressStatusBar from "@/Components/ProgressStatusBar.tsx";
 import { ProgressWebSocketProvider } from "@/contexts/ProgressWebSocketContext";
+import MainStatusBar from '@/Components/MainStatusBar';
 
 function App() {
 
@@ -59,6 +60,8 @@ function App() {
                         images={selectedImages}
                     />
               </div>
+
+              <MainStatusBar selectedImages={selectedImages} />
             </div>
         </ProgressWebSocketProvider>
   );
