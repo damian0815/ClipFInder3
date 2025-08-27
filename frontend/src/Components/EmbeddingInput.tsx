@@ -60,7 +60,7 @@ function EmbeddingInput(props: EmbeddingInputProps) {
                 value={props.embeddingInput.weight}
                 onChange={(value: number) => props.embeddingInput.weight = value}
                 min={-5} max={5} step={0.1} 
-                onKeyUp={(e) => {
+                onKeyUp={(e: React.KeyboardEvent) => {
                     if (e.key === 'Enter') {
                         props.onQueryRequested();
                     }

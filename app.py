@@ -1,29 +1,23 @@
 # Backend (app.py)
 import logging
 import traceback
+import threading
+import uuid
+import os
 from typing import List
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 from clip_finder_backend.clip_modelling import AutoloadingClipModel
-
-print("imported fastapi")
-
-from pydantic import BaseModel
-import os
-from tags_wrangler import TagsWrangler
-
-from clip_finder_backend.embedding_store import Query
-print("imported backend.clip_embedding_store.Query")
-from clip_finder_backend.embedding_store import SimpleClipEmbeddingStore
-print("imported backend.simple_clip_embedding_store.SimpleClipEmbeddingStore")
+from clip_finder_backend.progress_manager import ProgressManager
+from clip_finder_backend.embedding_store import Query, SimpleClipEmbeddingStore
 from clip_finder_backend.thumbnail_provider import ThumbnailProvider
-
-from fastapi import FastAPI, HTTPException
-
 from clip_finder_backend.types import ZeroShotClassifyRequest, ImageResponse
 from clip_finder_backend.zero_shot import do_zero_shot_classify
+from clip_finder_backend.tags_wrangler import TagsWrangler
 
 logging.basicConfig(level=logging.DEBUG,
                     format="%(asctime)s | %(levelname)-8s | "
@@ -59,8 +53,11 @@ embedding_store = load_embedding_store()
 
 print("making thumbnail provider")
 
+progress_manager = ProgressManager()
 thumbnail_provider = ThumbnailProvider()
-tags_wrangler = TagsWrangler(embedding_store.image_paths)
+tags_wrangler = TagsWrangler(
+    embedding_store.image_paths,
+    progress_callback=lambda p: progress_manager.update_task_progress_unified('Wrangling tags', p) )
 
 print("making FastAPI")
 
@@ -80,6 +77,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# WebSocket endpoint for progress updates
+@app.websocket("/ws/progress")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    await progress_manager.add_connection(websocket)
+
+    try:
+        # Keep the connection alive and handle any incoming messages
+        while True:
+            # You can add message handling here if needed
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await progress_manager.remove_connection(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        await progress_manager.remove_connection(websocket)
+
+@app.on_event("startup")
+async def startup_event():
+    """Start the progress manager when the FastAPI app starts"""
+    progress_manager.start()
+    logger.info("Application startup complete")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop the progress manager when the FastAPI app shuts down"""
+    progress_manager.stop()
+    logger.info("Application shutdown complete")
+
 
 @app.post("/api/search")
 async def search_images(query: Query):
@@ -121,24 +148,6 @@ async def zero_shot_classify(request: ZeroShotClassifyRequest):
     if request.is_empty:
         return
     return do_zero_shot_classify(request=request, embedding_provider=embedding_store)
-
-
-class PopulateRequest(BaseModel):
-    image_dir: str = "images"
-
-
-@app.post("/api/populate")
-async def populate_database(request: PopulateRequest):
-    # Verify directory exists
-    if not os.path.isdir(request.image_dir):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Directory '{request.image_dir}' does not exist"
-        )
-    logger.info(f"populating database from directory {request.image_dir}")
-    num_images_added = embedding_store.add_images_recursively(request.image_dir)
-    logger.info(f"populating done returned")
-    return {'message': f'added {num_images_added} images to embedding store'}
 
 
 class AddTagRequest(BaseModel):

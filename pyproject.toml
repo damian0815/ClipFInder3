@@ -14,7 +14,7 @@ dependencies = [
     'platformdirs>=3.0.0',
     'osxmetadata',
     'fastapi',
-    'uvicorn',
+    'uvicorn[standard]',
     'pydantic',
     #'MulticoreTSNE'
 ]

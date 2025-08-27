@@ -10,6 +10,7 @@ import ZeroShotClassificationQuery from "@/Components/ZeroShotClassificationQuer
 import Image from "@/Components/Image.tsx";
 import {useState} from "react";
 import {TagEditorSidebar} from "@/Components/TagEditorSidebar.tsx";
+import ProgressStatusBar from "@/Components/ProgressStatusBar.tsx";
 
 function App() {
 
@@ -62,6 +63,7 @@ function App() {
 
     return (
         <div className="App">
+            <ProgressStatusBar />
             <div className={`main-content ${sidebarOpen ? 'with-sidebar' : ''}`}>
                 <h1>Image Search</h1>
                 <Collapsible trigger={"Populate"}>

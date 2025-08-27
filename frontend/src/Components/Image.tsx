@@ -14,7 +14,7 @@ export default interface Image {
 
 export type ResultImageProps = {
   image: Image
-  onClick: (event?: React.MouseEvent, image: Image) => void
+  onClick: (event: React.MouseEvent, image: Image) => void
   onAddToQuery: (img: Image) => void
   onRevealInFinder: (img: Image) => void
   isSelected: boolean

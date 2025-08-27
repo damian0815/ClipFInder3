@@ -1,6 +1,6 @@
 import {useState} from "react";
-
 import {API_BASE_URL} from "../Constants.tsx";
+import TestProgress from "./TestProgress.tsx";
 
 function PopulateDatabase() {
     const [imageDir, setImageDir] = useState<string>('');
@@ -62,6 +62,7 @@ function PopulateDatabase() {
         >
             Populate Database
         </button>
+        <TestProgress />
     </>
 
 

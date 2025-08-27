@@ -1,15 +1,18 @@
 import json
 import os
+from typing import Callable
+
 from tqdm.auto import tqdm
 
 from osxmetadata import OSXMetaData, Tag, FINDER_COLOR_NONE
 
 class TagsWrangler:
 
-    def __init__(self, all_paths: list[str]):
+    def __init__(self, all_paths: list[str], progress_callback: Callable[[float], None]=None):
         self.known_tags = _load_known_tags()
         self.all_paths = all_paths
         self.tag_to_image_cache = None
+        self.progress_callback = progress_callback
 
     def get_all_known_tags(self):
         return self.known_tags
@@ -41,12 +44,18 @@ class TagsWrangler:
 
     def _populate_tag_to_image_cache(self):
         self.tag_to_image_cache = {}
-        for path in tqdm(self.all_paths):
+        if self.progress_callback:
+            self.progress_callback(0)
+        for i, path in enumerate(tqdm(self.all_paths)):
             try:
                 tags = self.get_tags(path)
                 self.tag_to_image_cache[path] = tags
+                if i%100 == 0 and self.progress_callback:
+                    self.progress_callback(i / len(self.all_paths))
             except Exception as e:
                 print(f"Error reading tags for {path}: {e}")
+        if self.progress_callback:
+            self.progress_callback(1)
 
 
 def _load_known_tags() -> list[str]:
