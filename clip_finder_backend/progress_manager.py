@@ -46,7 +46,6 @@ class ProgressMessage:
 class ProgressManager:
     """
     Manages WebSocket connections and broadcasts progress messages.
-    Designed to run in a separate thread from the main application.
     """
 
     def __init__(self):
@@ -54,7 +53,7 @@ class ProgressManager:
         self.active_tasks: Dict[str, ProgressMessage] = {}
         self._lock = threading.Lock()
 
-    async def add_connection(self, websocket, loop: asyncio.AbstractEventLoop):
+    def add_connection(self, websocket, loop: asyncio.AbstractEventLoop):
         """Add a new WebSocket connection"""
         with self._lock:
             self.connections.append((websocket, loop))
@@ -63,10 +62,10 @@ class ProgressManager:
         # Send current active tasks to the new connection
         for task_id, progress_msg in self.active_tasks.items():
             print("new connection: sending existing task", task_id, progress_msg)
-            await self._send_to_connection(websocket, progress_msg, loop)
+            self._send_to_connection(websocket, progress_msg, loop)
 
 
-    async def remove_connection(self, websocket):
+    def remove_connection(self, websocket):
         """Remove a WebSocket connection"""
         with self._lock:
             index = next((i for i, (ws, _) in enumerate(self.connections) if ws == websocket), None)
@@ -74,7 +73,7 @@ class ProgressManager:
                 del self.connections[index]
                 logger.info(f"Removed WebSocket connection. Total connections: {len(self.connections)}")
 
-    async def _send_to_connection(self, websocket: WebSocket, message: ProgressMessage, loop: AbstractEventLoop):
+    def _send_to_connection(self, websocket: WebSocket, message: ProgressMessage, loop: AbstractEventLoop):
         """Send a message to a specific WebSocket connection"""
         try:
             message_dict = asdict(message)
@@ -87,9 +86,9 @@ class ProgressManager:
         except Exception as e:
             logger.error(f"Error sending message to WebSocket: {e}")
             # Remove the connection if it's broken
-            await self.remove_connection(websocket)
+            self.remove_connection(websocket),
 
-    async def _broadcast_message(self, message: ProgressMessage):
+    def _broadcast_message(self, message: ProgressMessage):
         """Broadcast a message to all connected WebSocket clients"""
         print(f"ProgressManager about to broadcast. num_connections: {self.connections}", message)
         if not self.connections:
@@ -99,10 +98,10 @@ class ProgressManager:
         connections_copy = list(self.connections)
 
         for websocket, loop in connections_copy:
-            await self._send_to_connection(websocket, message, loop)
+            self._send_to_connection(websocket, message, loop)
         print("ProgressManager broadcast done", message)
 
-    async def send_progress_update(self, message: ProgressMessage):
+    def send_progress_update(self, message: ProgressMessage):
         """
         Send a progress update from any thread.
         This method is thread-safe and can be called from the main application thread.
@@ -112,9 +111,9 @@ class ProgressManager:
             self.active_tasks[message.task_id] = message
 
         # Schedule the broadcast in the event loop
-        await self._broadcast_message(message)
+        self._broadcast_message(message)
 
-    async def start_task(self, task_id: str, message: str = "", total_steps: Optional[int] = None):
+    def start_task(self, task_id: str, message: str = "", total_steps: Optional[int] = None):
         """Convenience method to start tracking a task"""
         progress_msg = ProgressMessage(
             task_id=task_id,
@@ -122,9 +121,9 @@ class ProgressManager:
             message=message,
             total_steps=total_steps
         )
-        await self.send_progress_update(progress_msg)
+        self.send_progress_update(progress_msg)
 
-    async def update_task_progress(self, task_id: str, progress: float, message: Optional[str] = None,
+    def update_task_progress(self, task_id: str, progress: float, message: Optional[str] = None,
                            current_step: Optional[str] = None, current_step_number: Optional[int] = None,
                            data: Optional[List[Any]|Dict[str, Any]] = None):
         """Convenience method to update task progress"""
@@ -142,9 +141,9 @@ class ProgressManager:
             current_step_number=current_step_number,
             data=data
         )
-        await self.send_progress_update(progress_msg)
+        self.send_progress_update(progress_msg)
 
-    async def complete_task(self, task_id: str, message: str = "", data: Optional[List[Any]|Dict[str, Any]] = None, status: ProgressStatus = ProgressStatus.COMPLETED):
+    def complete_task(self, task_id: str, message: str = "", data: Optional[List[Any]|Dict[str, Any]] = None, status: ProgressStatus = ProgressStatus.COMPLETED):
         """Convenience method to mark a task as completed"""
         progress_msg = ProgressMessage(
             task_id=task_id,
@@ -153,7 +152,7 @@ class ProgressManager:
             message=message,
             data=data
         )
-        await self.send_progress_update(progress_msg)
+        self.send_progress_update(progress_msg)
 
         # Remove from active tasks after a delay
         def cleanup():
@@ -163,9 +162,10 @@ class ProgressManager:
 
         threading.Thread(target=cleanup, daemon=True).start()
 
-    async def fail_task(self, task_id: str, message: str = "", error_details: Optional[str] = None):
+    def fail_task(self, task_id: str, message: str = "", error_details: Optional[str] = None):
         """Convenience method to mark a task as errored"""
-        await self.complete_task(
+        self.complete_task(
             task_id,
             status=ProgressStatus.ERROR,
             message=f'{message}\nError details: {error_details or ''}')
+

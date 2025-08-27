@@ -83,7 +83,7 @@ app.add_middleware(
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     loop = asyncio.get_event_loop()
-    await progress_manager.add_connection(websocket, loop)
+    progress_manager.add_connection(websocket, loop)
 
     try:
         # Keep the connection alive and handle any incoming messages
@@ -92,10 +92,10 @@ async def websocket_endpoint(websocket: WebSocket):
             #await websocket.receive_text()
             await asyncio.sleep(1)  # Keep the connection but don't block
     except WebSocketDisconnect:
-        await progress_manager.remove_connection(websocket)
+        progress_manager.remove_connection(websocket)
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
-        await progress_manager.remove_connection(websocket)
+        progress_manager.remove_connection(websocket)
 
 @app.on_event("startup")
 async def startup_event():
@@ -122,9 +122,16 @@ async def search_images(search_params: SearchRequest, background_tasks: Backgrou
     task_id = search_params.task_id
     print(f'starting search - "{query}"')
 
-    # Add the search task to background tasks
-    background_tasks.add_task(perform_search_task, task_id, query,
-                              progress_manager=progress_manager, embedding_store=embedding_store)
+    def perform_search_task_from_thread():
+        asyncio.run(
+            perform_search_task(
+                task_id, query,
+                progress_manager=progress_manager,
+                embedding_store=embedding_store)
+        )
+    await asyncio.to_thread(
+        perform_search_task_from_thread
+    )
 
     return TaskResponse(
         task_id=task_id,
@@ -147,9 +154,24 @@ class ImagesByTagsInput(BaseModel):
 @app.post("/api/images/by-tags")
 async def get_images_by_tags(input: ImagesByTagsInput, background_tasks: BackgroundTasks):
     task_id = input.task_id or str(f'tags-by-images-{uuid.uuid4()}')
-    background_tasks.add_task(
-        perform_get_images_by_tags_task, task_id=task_id, tags=input.tags,
-        progress_manager=progress_manager, embedding_store=embedding_store, tags_wrangler=tags_wrangler
+    #asyncio.create_task(
+    #    perform_get_images_by_tags_task(
+    #        task_id=task_id, tags=input.tags,
+    #        progress_manager=progress_manager, embedding_store=embedding_store,
+    #        tags_wrangler=tags_wrangler)
+    #)
+    #background_tasks.add_task(
+    #    perform_get_images_by_tags_task, task_id=task_id, tags=input.tags,
+    #    progress_manager=progress_manager, embedding_store=embedding_store, tags_wrangler=tags_wrangler
+    #
+    # Define a callback that can be safely called from another thread
+    def perform_get_images_by_tags_task_from_thread():
+        asyncio.run(
+            perform_get_images_by_tags_task(task_id=task_id, tags=input.tags,
+            progress_manager=progress_manager, embedding_store=embedding_store, tags_wrangler=tags_wrangler)
+        )
+    await asyncio.to_thread(
+        perform_get_images_by_tags_task_from_thread
     )
     return TaskResponse(
         task_id=task_id,

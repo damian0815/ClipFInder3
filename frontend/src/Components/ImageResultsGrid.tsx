@@ -14,8 +14,8 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     const [mode, setMode] = useState<'add' | 'remove' | 'replace' | 'reverse'>('replace');
     const [mouseIsOver, setMouseIsOver] = useState<boolean>(false);
 
-    const handleImageClick = (img: Image) => {
-        if (mode === 'add' || mode === 'remove') {
+    const handleImageClick = (ev: React.MouseEvent, img: Image) => {
+        if (ev.shiftKey || ev.metaKey) {
             const isSelected = selectedImages.includes(img);
             if (!isSelected) {
                 setSelectedImages([...selectedImages, img]);
@@ -95,7 +95,7 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
                         key={img.id}
                         image={img}
                         isSelected={selectedImages.includes(img)}
-                        onClick={(_) => handleImageClick(img)}
+                        onClick={(ev) => handleImageClick(ev, img)}
                         onAddToQuery={() => props.onAddToQuery(img)}
                         onRevealInFinder={() => handleRevealInFinder(img)}
                     />

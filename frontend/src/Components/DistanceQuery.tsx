@@ -69,6 +69,7 @@ function DistanceQuery(props: DistanceQueryProps) {
             console.log(`Starting search with offset ${offset}, taskId:`, taskId);
 
             // Start the search with the task ID
+            searchParams.offset = offset;
             await startSearchWithTaskId(searchParams, taskId);
 
             // Wait for the search to complete and get results from taskData
@@ -81,7 +82,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
-            return taskData.data || [];
+            return taskData.data;
         });
 
         if (searchResult.error) {
@@ -199,11 +200,11 @@ function DistanceQuery(props: DistanceQueryProps) {
 
         setIsLoadingMore(true);
         try {
-            const nextPage = currentOffset + pageSize;
-            const moreResults = await performSearchPage(nextPage, true);
+            const nextOffset = currentOffset + pageSize;
+            const moreResults = await performSearchPage(nextOffset, true);
 
-            setResultImages(prev => [...prev, ...moreResults]);
-            setCurrentOffset(nextPage);
+            setResultImages(prev => [...prev, ...moreResults]); //.filter(image => !prev.some(existing => existing.id === image.id))]);
+            setCurrentOffset(nextOffset);
 
         } catch (error) {
             console.error('Error loading more results:', error);
