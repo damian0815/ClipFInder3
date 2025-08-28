@@ -3,7 +3,6 @@ import os
 import uuid
 from dataclasses import dataclass, field
 from typing import Protocol, List, Literal, Callable, Optional
-from tsp_solver.greedy import solve_tsp
 
 import PIL
 import torch
@@ -12,6 +11,7 @@ from tqdm.auto import tqdm
 from pydantic import BaseModel, ConfigDict
 
 from clip_finder_backend.clip_modelling import ClipModel
+from clip_finder_backend.util import minimum_cost_path_coverage
 
 
 class Query(BaseModel):
@@ -315,11 +315,11 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         paginated_indices = ordered_indices[start_idx:end_idx]
 
         if query.sort_order == 'semantic_page':
-            # tsp
+            # Use minimum cost path coverage instead of TSP for better performance
             page_embeddings = corpus_embeddings[paginated_indices]
             distance_matrix = 1 - torch.matmul(page_embeddings, page_embeddings.T)
-            path = solve_tsp(distance_matrix, endpoints=(0, page_embeddings.shape[0]-1))
-            paginated_indices = [paginated_indices[i] for i in path]
+            path_order = minimum_cost_path_coverage(distance_matrix)
+            paginated_indices = [paginated_indices[i] for i in path_order]
 
         if progress_callback is not None:
             progress_callback(1, "Finished")

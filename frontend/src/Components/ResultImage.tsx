@@ -1,8 +1,8 @@
 import {API_BASE_URL} from "@/Constants.tsx";
-import {useState} from "react";
 import {useSelectable} from "react-selectable-box";
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import Image from "@/types/image";
+import { useTagMerge } from "@/contexts/TagMergeContext";
 
 export type ResultImageProps = {
   image: Image;
@@ -11,29 +11,27 @@ export type ResultImageProps = {
   onRevealInFinder: (img: Image) => void;
   isSelected: boolean;
   className?: string;
-  onMergeTagsFrom?: (image: Image) => void;
-  onMergeTagsTo?: (image: Image) => void;
-  isMergeSource?: boolean;
-  isMergeToDisabled?: boolean;
-  mergeSourceTagCount?: number;
 };
 
 export function ResultImage(props: ResultImageProps) {
-    const { setNodeRef, isSelected, isAdding, isRemoving } = useSelectable({
-        value: props.image,
-    });
-  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const { setNodeRef, isSelected, isAdding, isRemoving } = useSelectable({
+      value: props.image,
+  });
+
+  const { 
+    setMergeSource, 
+    mergeTagsTo, 
+    isMergeSource, 
+    isMergeToDisabled, 
+    mergeSourceTagCount 
+  } = useTagMerge();
 
   const handleMergeTagsFrom = () => {
-    if (props.onMergeTagsFrom) {
-      props.onMergeTagsFrom(props.image);
-    }
+    setMergeSource(props.image);
   };
 
   const handleMergeTagsTo = () => {
-    if (props.onMergeTagsTo) {
-      props.onMergeTagsTo(props.image);
-    }
+    mergeTagsTo(props.image);
   };
 
   return <div
@@ -41,17 +39,14 @@ export function ResultImage(props: ResultImageProps) {
       className={"p-2"}
       style={{
             border: isAdding ? '1px solid blue' : (isRemoving ? '1px solid red' : '1px solid transparent'), // Highlight selected images
-            background: isSelected ? '#1677ff40' : 'transparent',
-            zIndex: isHovered ? '100000' : '0',
-          }}
+            background: isSelected ? '#1677ff40' : 'transparent'
+      }}
     >
       <ContextMenu.Root>
         <ContextMenu.Trigger className="ContextMenuTrigger">
           <div
             onClick={(event) => props.onClick(event, props.image)} // Handle click event with event object
             className={props.className || ''}
-            onMouseEnter={(_) => setIsHovered(true)}
-            onMouseLeave={(_) => setIsHovered(false)}
           >
             <CorpusImage
               id={props.image.id}
@@ -77,22 +72,22 @@ export function ResultImage(props: ResultImageProps) {
               onClick={handleMergeTagsFrom}
             >
               Merge Tags From
-              {props.isMergeSource && (
+              {isMergeSource(props.image) && (
                 <span className="ml-2 text-xs text-blue-600">✓</span>
               )}
             </ContextMenu.Item>
             <ContextMenu.Item
               className={`px-3 py-2 text-sm rounded ${
-                props.isMergeToDisabled 
+                isMergeToDisabled(props.image) 
                   ? 'text-gray-400 cursor-not-allowed' 
                   : 'hover:bg-blue-100 cursor-pointer'
               }`}
               onClick={handleMergeTagsTo}
-              disabled={props.isMergeToDisabled}
+              disabled={isMergeToDisabled(props.image)}
             >
-              Merge Tags To
-              {props.mergeSourceTagCount !== undefined && (
-                <span className="ml-2 text-xs text-gray-500">({props.mergeSourceTagCount} tags)</span>
+              Merge Tags To & delete From
+              {mergeSourceTagCount !== undefined && (
+                <span className="ml-2 text-xs text-gray-500">({mergeSourceTagCount} tags)</span>
               )}
             </ContextMenu.Item>
           </ContextMenu.Content>

@@ -3,11 +3,10 @@ import { ResultImage } from "@/Components/ResultImage";
 import {
     TransformWrapper,
     TransformComponent,
-    useTransformContext,
-    useTransformComponent,
-    KeepScale
+    useTransformEffect
 } from "react-zoom-pan-pinch";
 import {useState} from "react";
+import { TagMergeProvider } from "@/contexts/TagMergeContext";
 
 
 type ImageResults2DProps = {
@@ -19,23 +18,27 @@ type ImageResults2DProps = {
 
 function ImageResults2D(props: ImageResults2DProps) {
 
-    return <div className="image-2d relative w-full aspect-square border border-gray-400">
-        <TransformWrapper initialScale={0.5}>
-            <TransformComponent
-                wrapperStyle={{width: "100%", height: "100%"}}
-                contentStyle={{width: "100%", height: "100%"}}
-            >
-                <ImageResults2DImages images={props.images} positions={props.positions} />
-            </TransformComponent>
-        </TransformWrapper>
-    </div>
+    return (
+        <TagMergeProvider>
+            <div className="image-2d relative w-full aspect-square border border-gray-400">
+                <TransformWrapper initialScale={0.5}>
+                    <TransformComponent
+                        wrapperStyle={{width: "100%", height: "100%"}}
+                        contentStyle={{width: "100%", height: "100%"}}
+                    >
+                        <ImageResults2DImages images={props.images} positions={props.positions} />
+                    </TransformComponent>
+                </TransformWrapper>
+            </div>
+        </TagMergeProvider>
+    )
 
 }
 
 function ImageResults2DImages(props: ImageResults2DProps) {
     const [imageScale, setImageScale] = useState<number>(1)
 
-    useTransformComponent(({state}) => {
+    useTransformEffect(({state}) => {
         if (state.scale != imageScale) {
             setImageScale(state.scale)
             console.log("scale:", state.scale)
@@ -50,14 +53,14 @@ function ImageResults2DImages(props: ImageResults2DProps) {
                         top: `${props.positions[index][1] * 100}%`
                     }}
         >
-            <KeepScale >
-                <ResultImage
-                    image={img}
-                    isSelected={false}
-                    onClick={(_) => {
-                    }}
-                />
-            </KeepScale>
+            <ResultImage
+                image={img}
+                isSelected={false}
+                onClick={(_) => {
+                }}
+                onAddToQuery={() => {}}
+                onRevealInFinder={() => {}}
+            />
         </div>
     )
 }

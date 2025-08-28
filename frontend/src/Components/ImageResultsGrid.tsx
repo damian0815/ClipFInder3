@@ -4,6 +4,7 @@ import { ResultImage } from "@/Components/ResultImage";
 import Selectable from 'react-selectable-box';
 import { API_BASE_URL } from "@/Constants";
 import { QuickLookOverlay } from "@/Components/QuickLookOverlay";
+import { TagMergeProvider } from "@/contexts/TagMergeContext";
 
 type ImageResultsGridProps = {
     images: Array<Image>;
@@ -19,10 +20,6 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     const [quickLookVisible, setQuickLookVisible] = useState<boolean>(false);
     const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
     const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(2); // Default to medium (index 2)
-
-    // Tag merge state - moved from module-level to component state
-    const [mergeSourceImage, setMergeSourceImage] = useState<Image | null>(null);
-    const [mergeSourceTags, setMergeSourceTags] = useState<string[]>([]);
 
     // Define Tailwind size options - expanded to 8 steps
     const sizeOptions = [
@@ -70,7 +67,6 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
         const updateMode = (e: KeyboardEvent) => {
             const shiftIsDown = e.shiftKey || (e.type === 'keydown' && e.key === 'Shift');
             const metaIsDown = e.metaKey || (e.type === 'keydown' && e.key === 'Meta');
-            const ctrlIsDown = e.ctrlKey || (e.type === 'keydown' && e.key === 'Control');
             const altIsDown = e.altKey || (e.type === 'keydown' && e.key === 'Alt');
 
             // Handle Space key for Quick Look
@@ -105,21 +101,14 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
         };
     }, [mode, lastSelectedImage, quickLookVisible, gridHasFocus]);
 
-    const handleMergeTagsFrom = (image: Image) => {
-        console.log("Selected image as tag source:", image.path, "Tags:", image.tags);
-        setMergeSourceImage(image);
-        setMergeSourceTags(image.tags || []);
-    };
-
-    const handleMergeTagsTo = async (targetImage: Image) => {
-        if (!mergeSourceImage || !mergeSourceTags.length) return;
-
-        console.log("Merging tags to:", targetImage.path, "From source tags:", mergeSourceTags);
+    const handleMergeComplete = async (sourceImage: Image, targetImage: Image) => {
+        console.log("Merging tags to:", targetImage.path, "From source tags:", sourceImage.tags);
 
         try {
             // Get current tags of target image to avoid duplicates
             const currentTags = targetImage.tags || [];
-            const tagsToAdd = mergeSourceTags.filter(tag => !currentTags.includes(tag));
+            const sourceTags = sourceImage.tags || [];
+            const tagsToAdd = sourceTags.filter((tag: string) => !currentTags.includes(tag));
 
             if (tagsToAdd.length === 0) {
                 console.log("No new tags to add - all source tags already exist on target image");
@@ -143,18 +132,17 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
             }
 
             // Delete the source image via API
-            await fetch(`${API_BASE_URL}/api/image/${mergeSourceImage.id}`, {
+            const deleteResult = await fetch(`${API_BASE_URL}/api/image/${sourceImage.id}`, {
                 method: 'DELETE'
             });
-
-            // Remove the source image from local state
-            if (props.onImageDeleted) {
-                props.onImageDeleted(mergeSourceImage.id);
+            if (!deleteResult.ok) {
+                console.error("Error deleting source image:", deleteResult.statusText, await deleteResult.text());
+            } else {
+                // Remove the source image from local state
+                if (props.onImageDeleted) {
+                    props.onImageDeleted(sourceImage.id);
+                }
             }
-
-            // Clear merge state
-            setMergeSourceImage(null);
-            setMergeSourceTags([]);
 
         } catch (error) {
             console.error("Error merging tags:", error);
@@ -162,82 +150,79 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     };
 
     return (
-        <div>
-            {/* Thumbnail size slider at top right */}
-            <div className="flex justify-between items-center mb-4">
-                <div></div> {/* Empty div to push slider to the right */}
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Size:</span>
-                    <input
-                        type="range"
-                        min="0"
-                        max="7"
-                        step="1"
-                        value={thumbnailSizeIndex}
-                        onChange={(e) => setThumbnailSizeIndex(Number(e.target.value))}
-                        className="w-24 accent-blue-500"
-                    />
-                    <span className="text-sm text-gray-600 min-w-[3rem]">{currentSize.name}</span>
+        <TagMergeProvider onMergeComplete={handleMergeComplete}>
+            <div>
+                {/* Thumbnail size slider at top right */}
+                <div className="flex justify-between items-center mb-4">
+                    <div></div> {/* Empty div to push slider to the right */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Size:</span>
+                        <input
+                            type="range"
+                            min="0"
+                            max="7"
+                            step="1"
+                            value={thumbnailSizeIndex}
+                            onChange={(e) => setThumbnailSizeIndex(Number(e.target.value))}
+                            className="w-24 accent-blue-500"
+                        />
+                        <span className="text-sm text-gray-600 min-w-[3rem]">{currentSize.name}</span>
+                    </div>
+                </div>
+                <div
+                    className="grid gap-5 mt-5 p-4 border border-gray-300"
+                    style={{
+                        gridTemplateColumns: `repeat(auto-fill, minmax(${currentSize.minWidth}, 1fr))`
+                    }}
+                    tabIndex={0}
+                    onMouseEnter={() => setMouseIsOver(true)}
+                    onMouseLeave={() => setMouseIsOver(false)}
+                    onFocus={() => setGridHasFocus(true)}
+                    onBlur={() => setGridHasFocus(false)}
+                    onClick={() => setGridHasFocus(true)}
+                >
+                    <Selectable
+                        disabled={!mouseIsOver}
+                        mode={mode === 'replace' ? 'reverse' : mode}
+                        value={selectedImages}
+                        onEnd={(newSelectedImages, { added, removed }) => {
+                            switch (mode) {
+                                case 'add':
+                                case 'remove':
+                                case 'reverse':
+                                    setSelectedImages(selectedImages.concat(added).filter((i) => !removed.includes(i)));
+                                    break;
+                                case 'replace':
+                                    setSelectedImages(newSelectedImages)
+                                    break
+                            }
+                        }}
+                    >
+
+                        {props.images.map((img) => (
+                            <ResultImage
+                                key={img.id}
+                                image={img}
+                                isSelected={selectedImages.includes(img)}
+                                onClick={(ev) => handleImageClick(ev, img)}
+                                onAddToQuery={() => props.onAddToQuery(img)}
+                                onRevealInFinder={() => handleRevealInFinder(img)}
+                                className={currentSize.class}
+                            />
+                        ))}
+
+                    </Selectable>
+
+                    {quickLookVisible && lastSelectedImage && (
+                        <QuickLookOverlay
+                            image={lastSelectedImage}
+                            onClose={() => setQuickLookVisible(false)}
+                        />
+                    )}
+
                 </div>
             </div>
-            <div
-                className="grid gap-5 mt-5 p-4 border border-gray-300"
-                style={{
-                    gridTemplateColumns: `repeat(auto-fill, minmax(${currentSize.minWidth}, 1fr))`
-                }}
-                tabIndex={0}
-                onMouseEnter={() => setMouseIsOver(true)}
-                onMouseLeave={() => setMouseIsOver(false)}
-                onFocus={() => setGridHasFocus(true)}
-                onBlur={() => setGridHasFocus(false)}
-                onClick={() => setGridHasFocus(true)}
-            >
-                <Selectable
-                    disabled={!mouseIsOver}
-                    mode={mode === 'replace' ? 'reverse' : mode}
-                    value={selectedImages}
-                    onEnd={(newSelectedImages, { added, removed }) => {
-                        switch (mode) {
-                            case 'add':
-                            case 'remove':
-                            case 'reverse':
-                                setSelectedImages(selectedImages.concat(added).filter((i) => !removed.includes(i)));
-                                break;
-                            case 'replace':
-                                setSelectedImages(newSelectedImages)
-                                break
-                        }
-                    }}
-                >
-
-                    {props.images.map((img, index) => (
-                        <ResultImage
-                            key={img.id}
-                            image={img}
-                            isSelected={selectedImages.includes(img)}
-                            onClick={(ev) => handleImageClick(ev, img)}
-                            onAddToQuery={() => props.onAddToQuery(img)}
-                            onRevealInFinder={() => handleRevealInFinder(img)}
-                            onMergeTagsFrom={handleMergeTagsFrom}
-                            onMergeTagsTo={handleMergeTagsTo}
-                            isMergeSource={mergeSourceImage?.id === img.id}
-                            isMergeToDisabled={!mergeSourceImage || mergeSourceTags.length === 0}
-                            mergeSourceTagCount={mergeSourceTags.length > 0 ? mergeSourceTags.length : undefined}
-                            className={currentSize.class}
-                        />
-                    ))}
-
-                </Selectable>
-
-                {quickLookVisible && lastSelectedImage && (
-                    <QuickLookOverlay
-                        image={lastSelectedImage}
-                        onClose={() => setQuickLookVisible(false)}
-                    />
-                )}
-
-            </div>
-        </div>
+        </TagMergeProvider>
     );
 }
 

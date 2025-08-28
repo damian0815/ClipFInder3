@@ -8,6 +8,9 @@ import {v4 as uuidv4} from 'uuid';
 import {startSearchWithTaskId, SearchParams} from "@/api/search";
 import {useAsyncTaskManager} from "@/hooks/useAsyncTaskManager";
 import {getImageIdsForTagsAsync as startGetImageIdsForTagsAsync} from "@/api";
+import {useProgressWebSocketContext} from "@/contexts/ProgressWebSocketContext";
+import {useSearchHistory, SearchHistoryEntry} from "@/hooks/useSearchHistory";
+import {SearchHistoryDropdown} from "@/Components/SearchHistoryDropdown";
 
 
 type DistanceQueryProps = {
@@ -26,6 +29,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [resultImages, setResultImages] = useState<Image[]>([]);
     const [searchError, setSearchError] = useState<string | null>(null);
     const [searchIsRunning, setSearchIsRunning] = useState(false);
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
     // Infinite scroll state
     const [currentOffset, setCurrentOffset] = useState(0);
@@ -39,6 +43,48 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     // Use the async task manager for all tasks
     const taskManager = useAsyncTaskManager();
+    
+    // Get WebSocket connection status for search availability
+    const { connectionStatus } = useProgressWebSocketContext();
+
+    // Search history functionality
+    const { history, addToHistory, removeFromHistory, clearHistory } = useSearchHistory();
+
+    const restoreFromHistory = useCallback((entry: SearchHistoryEntry) => {
+        console.log('Restoring search from history:', entry);
+        
+        // Clear current results
+        setResultImages([]);
+        setSearchError(null);
+        setCurrentOffset(0);
+        setHasMoreResults(true);
+        setCurrentSearchParams(null);
+        
+        // Restore search state
+        setEmbeddingInputs(entry.embeddingInputs);
+        setFilterInput(entry.filterInput);
+        setSortOrder(entry.sortOrder);
+        
+        // Show a brief success message
+        setStatusMessage(`Restored search from ${new Date(entry.timestamp).toLocaleString()}`);
+        setTimeout(() => setStatusMessage(null), 3000);
+        
+        // Note: We don't automatically trigger the search, let the user click search
+    }, []);
+
+    // Optionally restore the most recent search on component mount
+    useEffect(() => {
+        if (history.length > 0 && embeddingInputs.length === 0) {
+            // Only restore if we don't have any current inputs and it's the initial load
+            const mostRecent = history[0];
+            console.log('Restoring most recent search on mount:', mostRecent);
+            setEmbeddingInputs(mostRecent.embeddingInputs);
+            setFilterInput(mostRecent.filterInput);
+            setSortOrder(mostRecent.sortOrder);
+            setStatusMessage('Restored most recent search');
+            setTimeout(() => setStatusMessage(null), 2000);
+        }
+    }, [history, embeddingInputs.length]);
 
     const cancelSearch = () => {
         if (searchIsRunning) {
@@ -70,7 +116,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                     if (searchCancelledRef.current) {
                         throw new Error("Search cancelled");
                     }
-                    console.log(`Waiting for search with offset ${offset} to complete...`);
+                    console.log(`Waiting for search with offset ${offset} task id ${taskId} to complete...`);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
 
@@ -122,6 +168,12 @@ function DistanceQuery(props: DistanceQueryProps) {
     const performPage0Search = async () => {
         if (embeddingInputs.length === 0) {
             console.log("can't perform search, no inputs")
+            return;
+        }
+
+        if (connectionStatus !== 'connected') {
+            console.log("can't perform search, WebSocket not connected")
+            setSearchError(`Cannot search: WebSocket is ${connectionStatus}`);
             return;
         }
 
@@ -190,6 +242,9 @@ function DistanceQuery(props: DistanceQueryProps) {
             setResultImages(initialResults);
             setSearchIsRunning(false);
 
+            // Save search to history after successful completion
+            addToHistory(embeddingInputs, filterInput, sortOrder);
+
         } catch (error) {
             setSearchIsRunning(false);
             setSearchError(error instanceof Error ? error.message : 'Search failed');
@@ -199,6 +254,12 @@ function DistanceQuery(props: DistanceQueryProps) {
     // Function to load more results
     const loadMoreResults = useCallback(async () => {
         if (!hasMoreResults || searchIsRunning || !currentSearchParams) {
+            return;
+        }
+
+        if (connectionStatus !== 'connected') {
+            console.log("can't load more results, WebSocket not connected")
+            setSearchError(`Cannot load more results: WebSocket is ${connectionStatus}`);
             return;
         }
 
@@ -215,7 +276,7 @@ function DistanceQuery(props: DistanceQueryProps) {
             console.error('Error loading more results:', error);
             setSearchError(error instanceof Error ? error.message : 'Failed to load more results');
         }
-    }, [currentOffset, hasMoreResults, searchIsRunning, currentSearchParams]);
+    }, [currentOffset, hasMoreResults, searchIsRunning, currentSearchParams, connectionStatus, resultImages]);
 
     useEffect(() => {
         // Attach scroll event listener for infinite scroll
@@ -253,7 +314,7 @@ function DistanceQuery(props: DistanceQueryProps) {
 
             <div className={'flex flex-wrap gap-4 w-full'}>
                 {embeddingInputs.map((input) => (
-                    <div key={input.id} className={"w-40 flex-shrink-0"}>
+                    <div key={input.id} className={"w-80 flex-shrink-0"}>
                         <EmbeddingInput 
                             embeddingInput={input} 
                             onDeleteClicked={(_) => handleDeleteEmbeddingInput(input.id)}
@@ -272,21 +333,42 @@ function DistanceQuery(props: DistanceQueryProps) {
                 </div>
             </div>
             <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
-            <div className={"w-full flex flex-row justify-around"}>
+            
+            {/* Search controls row */}
+            <div className={"w-full flex flex-row justify-around items-center gap-2"}>
+                <SearchHistoryDropdown
+                    history={history}
+                    onSelectEntry={restoreFromHistory}
+                    onRemoveEntry={removeFromHistory}
+                    onClearHistory={clearHistory}
+                    className="w-1/4"
+                />
+                
                 <button
-                    className={"btn btn-primary border rounded w-1/3 h-10 mt-1"}
+                    className={"btn btn-primary border rounded w-1/4 h-10 mt-1"}
                     onClick={performPage0Search}
-                    disabled={searchIsRunning || embeddingInputs.length === 0 || embeddingInputs.filter(input => input.value).length === 0}
+                    disabled={
+                        searchIsRunning || 
+                        connectionStatus !== 'connected' ||
+                        embeddingInputs.length === 0 || 
+                        embeddingInputs.filter(input => input.value).length === 0
+                    }
                 >
-                    {searchIsRunning ? 'Searching...' : `Search (${embeddingInputs.filter(input => input.value).length} non-empty inputs)`}
+                    {connectionStatus !== 'connected' 
+                        ? `Search (WebSocket ${connectionStatus})`
+                        : searchIsRunning 
+                        ? 'Searching...' 
+                        : `Search (${embeddingInputs.filter(input => input.value).length} non-empty inputs)`
+                    }
                 </button>
                 <button
-                    className={"btn btn-primary border rounded w-1/3 h-10 mt-1"}
+                    className={"btn btn-primary border rounded w-1/4 h-10 mt-1"}
                     onClick={cancelSearch}
                     disabled={!searchIsRunning}
                 >Cancel search</button>
+                
                 <select
-                    className={"border rounded px-2 py-1"}
+                    className={"border rounded px-2 py-1 w-1/4"}
                     value={sortOrder}
                     onChange={e => setSortOrder(e.target.value as 'similarity' | 'semantic_page')}
                 >
@@ -296,6 +378,9 @@ function DistanceQuery(props: DistanceQueryProps) {
             </div>
             {searchError && (
                 <div className="text-red-500 mt-2">Error: {searchError}</div>
+            )}
+            {statusMessage && (
+                <div className="text-green-600 mt-2">{statusMessage}</div>
             )}
         </div>
         <div>Current offset: {currentSearchParams?.offset ?? "<undefined>"}</div>

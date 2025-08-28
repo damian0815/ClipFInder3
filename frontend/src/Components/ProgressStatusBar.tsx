@@ -83,7 +83,7 @@ interface ProgressStatusBarProps {
 }
 
 export function ProgressStatusBar({ className = '', maxVisible = 5 }: ProgressStatusBarProps) {
-    const { activeTasks, connectionStatus, clearActiveTasks } = useProgressWebSocketContext();
+    const { activeTasks, connectionStatus, clearActiveTasks, connect } = useProgressWebSocketContext();
 
     /*if (activeTasks.length === 0 && connectionStatus === 'connected') {
         return null; // Don't show anything when no active tasks
@@ -93,6 +93,13 @@ export function ProgressStatusBar({ className = '', maxVisible = 5 }: ProgressSt
     }, [activeTasks]);
 
     const visibleTasks = [...activeTasks.values()].slice(-maxVisible); // Show most recent tasks
+
+    const handleConnectionStatusClick = () => {
+        if (connectionStatus === 'disconnected' || connectionStatus === 'error') {
+            console.log('Manually triggering WebSocket reconnect...');
+            connect();
+        }
+    };
 
     return (
         <div className={`fixed top-4 right-4 w-96 z-50 ${className}`}>
@@ -108,9 +115,18 @@ export function ProgressStatusBar({ className = '', maxVisible = 5 }: ProgressSt
                                 : 'bg-red-400'
                         }`}
                     ></div>
-                    <span className="text-xs text-gray-600">
+                    <button
+                        onClick={handleConnectionStatusClick}
+                        className={`text-xs text-gray-600 ${
+                            connectionStatus === 'disconnected' || connectionStatus === 'error'
+                                ? 'hover:text-blue-600 cursor-pointer underline'
+                                : 'cursor-default'
+                        }`}
+                        disabled={connectionStatus === 'connected' || connectionStatus === 'connecting'}
+                    >
                         Progress: {connectionStatus}
-                    </span>
+                        {(connectionStatus === 'disconnected' || connectionStatus === 'error') && ' (click to reconnect)'}
+                    </button>
                 </div>
                 {activeTasks.size > 0 && (
                     <button

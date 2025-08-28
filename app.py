@@ -306,6 +306,14 @@ async def serve_thumbnail(id: str):
     thumbnail_path = thumbnail_provider.get_or_create_thumbnail(original_path)
     return FileResponse(thumbnail_path)
 
+@app.get("/api/cleanupMissing")
+async def cleanup_missing_images():
+    try:
+        embedding_store.cleanup_missing_files()
+    except Exception as e:
+        logging.error(f"Error during cleanup: {repr(e)}")
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
+
 
 if __name__ == '__main__':
     import uvicorn

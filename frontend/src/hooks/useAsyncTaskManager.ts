@@ -48,6 +48,9 @@ export function useAsyncTaskManager(): AsyncTaskManager {
                 const current = taskDataRef.current.get(taskId) || initialTaskData;
                 const wsTask = progressWebSocket.activeTasks.get(taskId);
 
+                console.log(`getTaskData for taskId ${taskId}: wsTask =`, wsTask, 'activeTasks size =', progressWebSocket.activeTasks.size);
+                console.log('All active task IDs:', Array.from(progressWebSocket.activeTasks.keys()));
+                
                 if (wsTask) {
                     const newData = {
                         ...current,

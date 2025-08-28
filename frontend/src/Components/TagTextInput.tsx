@@ -38,7 +38,6 @@ export function TagTextInput(props: TagTextInputProps) {
         if (value.trim().length > 0 && !isLoading) {
             const filtered = knownTags
                 .filter(tag => tag.toLowerCase().includes(value.toLowerCase()))
-                .filter(tag => tag !== value) // Don't show exact matches
                 .slice(0, 10); // Limit to 10 suggestions
             setFilteredSuggestions(filtered);
             setShowSuggestions(filtered.length > 0);

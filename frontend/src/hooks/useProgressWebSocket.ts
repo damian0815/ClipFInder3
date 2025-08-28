@@ -3,7 +3,6 @@ import { ProgressMessage } from '@/types/progress';
 
 const WEBSOCKET_URL = 'ws://localhost:8000/ws/progress';
 const RECONNECT_INTERVAL = 3000; // 3 seconds
-const MAX_RECONNECT_ATTEMPTS = 10;
 
 type UseProgressWebSocketData = {
     messages: ProgressMessage[];
@@ -75,9 +74,9 @@ function globalConnect() {
             globalWs = null;
             notifyListeners();
 
-            if (!event.wasClean && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            if (!event.wasClean) {
                 reconnectAttempts++;
-                console.log(`Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+                console.log(`Reconnecting... (attempt ${reconnectAttempts})`);
 
                 reconnectTimeout = setTimeout(() => {
                     globalConnect();
@@ -111,6 +110,25 @@ function globalDisconnect() {
 
     globalConnectionStatus = 'disconnected';
     notifyListeners();
+}
+
+function manualReconnect() {
+    // Reset reconnection attempts for manual reconnection
+    reconnectAttempts = 0;
+    
+    // Clear any existing timeout
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = undefined;
+    }
+    
+    // Force disconnect first, then reconnect
+    if (globalWs) {
+        globalWs.close(1000, 'Manual reconnect');
+        globalWs = null;
+    }
+    
+    globalConnect();
 }
 
 export function useProgressWebSocket(): UseProgressWebSocketData {
@@ -160,7 +178,7 @@ export function useProgressWebSocket(): UseProgressWebSocketData {
         messages: globalMessages,
         connectionStatus: globalConnectionStatus,
         activeTasks: globalActiveTasks,
-        connect: globalConnect,
+        connect: manualReconnect, // Use manual reconnect for user-initiated connections
         disconnect: globalDisconnect,
         clearMessages,
         clearActiveTasks,
