@@ -20,6 +20,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[]>([])
     const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
     const pageSize = 50;
+    const [sortOrder, setSortOrder] = useState<'similarity' | 'semantic_page'>('similarity')
 
     // Search state variables
     const [resultImages, setResultImages] = useState<Image[]>([]);
@@ -179,7 +180,8 @@ function DistanceQuery(props: DistanceQueryProps) {
                 excluded_image_ids: excludedImageIds,
                 required_image_ids: requiredImageIds,
                 offset: 0,
-                limit: pageSize
+                limit: pageSize,
+                sort_order: sortOrder
             };
             setCurrentSearchParams(searchParams);
 
@@ -242,18 +244,18 @@ function DistanceQuery(props: DistanceQueryProps) {
     }
 
     return <>
-        <div className={"gap-4 border"}>
+        <div className={"gap-4"}>
 
-            <div className={'flex flex-wrap gap-4 w-full border'}>
+            <div className={'flex flex-wrap gap-4 w-full'}>
                 {embeddingInputs.map((input) => (
-                    <div key={input.id} className={"w-40 flex-shrink-0 border"}>
+                    <div key={input.id} className={"w-40 flex-shrink-0"}>
                         <EmbeddingInput 
                             embeddingInput={input} 
                             onDeleteClicked={(_) => handleDeleteEmbeddingInput(input.id)}
                             onQueryRequested={performPage0Search} />
                     </div>
                 ))}
-                <div className={'w-40 flex-shrink-0 border inline-block'}>
+                <div className={'w-40 flex-shrink-0 inline-block'}>
                     <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs,
                         new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, text:''})])}>
                         + Add Text Input
@@ -278,6 +280,14 @@ function DistanceQuery(props: DistanceQueryProps) {
                     onClick={cancelSearch}
                     disabled={!searchIsRunning}
                 >Cancel search</button>
+                <select
+                    className={"border rounded px-2 py-1"}
+                    value={sortOrder}
+                    onChange={e => setSortOrder(e.target.value as 'similarity' | 'semantic_page')}
+                >
+                    <option value="similarity">Similarity</option>
+                    <option value="semantic_page">Semantic (by page)</option>
+                </select>
             </div>
             {searchError && (
                 <div className="text-red-500 mt-2">Error: {searchError}</div>

@@ -24,7 +24,7 @@ class TagsWrangler:
 
     def get_images_for_tags(self, tags: list[str], progress_callback: Optional[Callable[[float, str], None]] = None) -> list[str]:
         if self.tag_to_image_cache is None:
-            self._populate_tag_to_image_cache(progress_callback=lambda p: progress_callback(p*0.9, "Loading tags...") if progress_callback else None)
+            self._populate_tag_to_image_cache(progress_callback=lambda p: progress_callback(p, "Loading tags...") if progress_callback else None)
         paths = [p for p, file_tags in self.tag_to_image_cache.items()
                  if any(t in file_tags for t in tags)]
         if progress_callback is not None:
@@ -56,7 +56,7 @@ class TagsWrangler:
         self.tag_to_image_cache = {}
         if progress_callback:
             progress_callback(0)
-        progress_interval = max(1, len(self.all_paths) // 10)
+        progress_interval = max(1, len(self.all_paths) // 100)
         for i, path in enumerate(tqdm(self.all_paths)):
             try:
                 if os.path.exists(path):

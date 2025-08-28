@@ -3,6 +3,7 @@ import os
 import uuid
 from dataclasses import dataclass, field
 from typing import Protocol, List, Literal, Callable, Optional
+from tsp_solver.greedy import solve_tsp
 
 import PIL
 import torch
@@ -31,6 +32,7 @@ class Query(BaseModel):
     # Pagination parameters
     offset: int = 0
     limit: int = 100
+    sort_order: Literal['similarity', 'semantic_page'] = 'similarity'
 
     @staticmethod
     def text_query(text: str):
@@ -219,12 +221,12 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         weights = list(query.weights)
         if progress_callback is not None:
             progress_callback(0, "Computing embeddings")
-        all_embeddings = [
+        all_query_embeddings = [
             self.get_text_embedding(t).unsqueeze(0)
             for t in query.texts
         ]
         if query.image_ids:
-            weight_index_offset = len(all_embeddings)
+            weight_index_offset = len(all_query_embeddings)
             id_paths = [i for i in [self.get_image_path_for_id(i) for i in query.image_ids]
                             if i is not None]
             actual_paths, image_embeddings = self.get_image_embeddings(id_paths)
@@ -233,21 +235,21 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
                                    if p not in actual_paths]
             for index in reversed(missing_image_indices):
                 del weights[index]
-            all_embeddings.append(image_embeddings)
+            all_query_embeddings.append(image_embeddings)
 
         if query.embeddings:
-            all_embeddings.extend([torch.tensor(e) for e in query.embeddings])
+            all_query_embeddings.extend([torch.tensor(e) for e in query.embeddings])
 
-        if any(len(t.shape) != 2 for t in all_embeddings):
+        if any(len(t.shape) != 2 for t in all_query_embeddings):
             raise ValueError("all query embeddings must be of shape [1, embedding_dim]")
-        if len(all_embeddings) == 0:
+        if len(all_query_embeddings) == 0:
             print("Empty query, returning no results")
             return []
-        all_embeddings = torch.cat(all_embeddings, dim=0).to(self.image_embeddings.device, dtype=self.image_embeddings.dtype)
-        if all_embeddings.shape[0] != len(weights):
-            raise ValueError(f"there must be 1 weight for every embedding, text, or image in the query (got {all_embeddings.shape[0]} embeddings and {len(weights)} weights)")
-        all_embeddings /= all_embeddings.norm(dim=-1, keepdim=True)
-        weights = torch.tensor(weights).to(all_embeddings.device, dtype=all_embeddings.dtype)
+        all_query_embeddings = torch.cat(all_query_embeddings, dim=0).to(self.image_embeddings.device, dtype=self.image_embeddings.dtype)
+        if all_query_embeddings.shape[0] != len(weights):
+            raise ValueError(f"there must be 1 weight for every embedding, text, or image in the query (got {all_query_embeddings.shape[0]} embeddings and {len(weights)} weights)")
+        all_query_embeddings /= all_query_embeddings.norm(dim=-1, keepdim=True)
+        weights = torch.tensor(weights).to(all_query_embeddings.device, dtype=all_query_embeddings.dtype)
 
         filtered_corpus_paths: set[str]|None = None
         def intersect_corpus_paths(paths: list[str]):
@@ -294,7 +296,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         if progress_callback is not None:
             progress_callback(0.25, "Computing similarities")
 
-        similarities = torch.matmul(all_embeddings, corpus_embeddings.T)
+        similarities = torch.matmul(all_query_embeddings, corpus_embeddings.T)
         weighted_similarities = (similarities.T * weights).T
         if query.reduce_method == 'sum':
             summed_similarities = weighted_similarities.sum(dim=0)
@@ -311,6 +313,13 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         start_idx = query.offset
         end_idx = start_idx + query.limit
         paginated_indices = ordered_indices[start_idx:end_idx]
+
+        if query.sort_order == 'semantic_page':
+            # tsp
+            page_embeddings = corpus_embeddings[paginated_indices]
+            distance_matrix = 1 - torch.matmul(page_embeddings, page_embeddings.T)
+            path = solve_tsp(distance_matrix, endpoints=(0, page_embeddings.shape[0]-1))
+            paginated_indices = [paginated_indices[i] for i in path]
 
         return [QueryResult(similarity=summed_similarities[i].item(),
                             path=corpus_paths[i],
