@@ -52,8 +52,8 @@ class ImageResponse:
         self.path = path
         self.distance = distance or 0
         self.tags = tags or get_tags(path)
-        if self.tags:
-            print('tags:', self.tags, 'path:', path)
+        #if self.tags:
+        #    print('tags:', self.tags, 'path:', path)
 
 
 @dataclass

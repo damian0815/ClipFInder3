@@ -66,7 +66,7 @@ class EmbeddingStore(Protocol):
     def get_text_embedding(self, text: str) -> torch.Tensor:
         ...
 
-    def search_images(self, query: Query, limit=100, progress_callback: Optional[Callable[[float, str], None]]=None) -> List[QueryResult]:
+    def search_images(self, query: Query, progress_callback: Optional[Callable[[float, str], None]]=None) -> List[QueryResult]:
         ...
 
     def has_image(self, path: str) -> bool:
@@ -90,10 +90,10 @@ class EmbeddingStore(Protocol):
         self.add_images(images_to_add)
         return len(images_to_add)
 
-    def get_image_path_for_id(self, id: str):
+    def get_image_path_for_id(self, id: str) -> str:
         ...
 
-    def get_image_ids_for_paths(self, image_paths: list[str]):
+    def get_image_ids_for_paths(self, image_paths: list[str]) -> list[str]:
         ...
 
 
@@ -307,7 +307,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         ordered_indices = torch.argsort(summed_similarities, dim=0, descending=True)
 
         if progress_callback is not None:
-            progress_callback(1, "Finished")
+            progress_callback(0.9, "Sorting")
 
         # Apply pagination
         start_idx = query.offset
@@ -320,6 +320,9 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             distance_matrix = 1 - torch.matmul(page_embeddings, page_embeddings.T)
             path = solve_tsp(distance_matrix, endpoints=(0, page_embeddings.shape[0]-1))
             paginated_indices = [paginated_indices[i] for i in path]
+
+        if progress_callback is not None:
+            progress_callback(1, "Finished")
 
         return [QueryResult(similarity=summed_similarities[i].item(),
                             path=corpus_paths[i],
@@ -431,9 +434,19 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         }, path)
 
 
-    def get_image_ids_for_paths(self, image_paths):
+    def get_image_ids_for_paths(self, image_paths: list[str]) -> list[str]:
         indices = [self.image_paths.index(p) for p in image_paths if p in self.image_paths]
         return [self.image_ids[i] for i in indices]
+
+
+    def remove_image(self, id: str):
+        if self.is_readonly:
+            raise ReadOnlyException("Readonly store is read-only")
+        index = self.image_ids.index(id)
+        del self.image_ids[index]
+        del self.image_paths[index]
+        del self.image_hases[index]
+        self.image_embeddings = self.image_embeddings[torch.arange(self.image_embeddings.shape[0]) != index]
 
 
 def _compute_md5_hash(path):
@@ -531,11 +544,23 @@ class ShardedEmbeddingStore(EmbeddingStore):
     def get_text_embedding(self, text: str) -> torch.Tensor:
         return self.clip_model.get_text_features(text)
 
-    def search_images(self, query: Query, limit=100) -> List[QueryResult]:
+    def search_images(self, query: Query, progress_callback: Callable[[float, str], None]=None) -> List[QueryResult]:
         results = []
-        for shard in tqdm(self.shards, leave=False):
-            results.extend(shard.search_images(query))
-        return sorted(results, key=lambda r: r.distance)[:limit]
+        offset = query.offset
+        limit = query.limit
+        query.offset = 0
+        query.limit = offset + limit
+
+        progress_per_shard = 1.0 / len(self.shards)
+        for shard_index, shard in enumerate(tqdm(self.shards, leave=False)):
+            def progress_callback_internal(progress, message):
+                if progress_callback:
+                    progress_callback(progress_per_shard * (shard_index + progress),
+                                  f"shard {shard_index}: {message}")
+            results.extend(shard.search_images(query, progress_callback_internal))
+        results = sorted(results, key=lambda r: r.distance)
+        return results[offset:offset+limit]
+
 
     def has_image(self, path: str) -> bool:
         for shard in self.shards:

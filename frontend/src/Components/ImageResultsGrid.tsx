@@ -9,6 +9,7 @@ type ImageResultsGridProps = {
     images: Array<Image>;
     onSelect: (selectedImages: Array<Image>) => void; // Callback to pass selected images to parent
     onAddToQuery: (image: Image) => void;
+    onImageDeleted?: (imageId: string) => void;
 }
 
 function ImageResultsGrid(props: ImageResultsGridProps) {
@@ -18,6 +19,10 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     const [quickLookVisible, setQuickLookVisible] = useState<boolean>(false);
     const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
     const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(2); // Default to medium (index 2)
+
+    // Tag merge state - moved from module-level to component state
+    const [mergeSourceImage, setMergeSourceImage] = useState<Image | null>(null);
+    const [mergeSourceTags, setMergeSourceTags] = useState<string[]>([]);
 
     // Define Tailwind size options - expanded to 8 steps
     const sizeOptions = [
@@ -100,6 +105,62 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
         };
     }, [mode, lastSelectedImage, quickLookVisible, gridHasFocus]);
 
+    const handleMergeTagsFrom = (image: Image) => {
+        console.log("Selected image as tag source:", image.path, "Tags:", image.tags);
+        setMergeSourceImage(image);
+        setMergeSourceTags(image.tags || []);
+    };
+
+    const handleMergeTagsTo = async (targetImage: Image) => {
+        if (!mergeSourceImage || !mergeSourceTags.length) return;
+
+        console.log("Merging tags to:", targetImage.path, "From source tags:", mergeSourceTags);
+
+        try {
+            // Get current tags of target image to avoid duplicates
+            const currentTags = targetImage.tags || [];
+            const tagsToAdd = mergeSourceTags.filter(tag => !currentTags.includes(tag));
+
+            if (tagsToAdd.length === 0) {
+                console.log("No new tags to add - all source tags already exist on target image");
+                // Still delete source image even if no tags were added
+            } else {
+                // Add each new tag to the target image
+                for (const tag of tagsToAdd) {
+                    await fetch(`${API_BASE_URL}/api/addTag`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            image_ids: [targetImage.id],
+                            tag_to_add: tag
+                        })
+                    });
+                }
+
+                console.log(`Successfully merged ${tagsToAdd.length} tags to ${targetImage.path}`);
+            }
+
+            // Delete the source image via API
+            await fetch(`${API_BASE_URL}/api/image/${mergeSourceImage.id}`, {
+                method: 'DELETE'
+            });
+
+            // Remove the source image from local state
+            if (props.onImageDeleted) {
+                props.onImageDeleted(mergeSourceImage.id);
+            }
+
+            // Clear merge state
+            setMergeSourceImage(null);
+            setMergeSourceTags([]);
+
+        } catch (error) {
+            console.error("Error merging tags:", error);
+        }
+    };
+
     return (
         <div>
             {/* Thumbnail size slider at top right */}
@@ -157,6 +218,11 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
                             onClick={(ev) => handleImageClick(ev, img)}
                             onAddToQuery={() => props.onAddToQuery(img)}
                             onRevealInFinder={() => handleRevealInFinder(img)}
+                            onMergeTagsFrom={handleMergeTagsFrom}
+                            onMergeTagsTo={handleMergeTagsTo}
+                            isMergeSource={mergeSourceImage?.id === img.id}
+                            isMergeToDisabled={!mergeSourceImage || mergeSourceTags.length === 0}
+                            mergeSourceTagCount={mergeSourceTags.length > 0 ? mergeSourceTags.length : undefined}
                             className={currentSize.class}
                         />
                     ))}

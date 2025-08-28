@@ -146,6 +146,33 @@ async def serve_image(id: str):
         raise HTTPException(status_code=404, detail=f"Image not found: {file_path}")
     return FileResponse(file_path)
 
+@app.delete("/api/image/{id}")
+async def delete_image(id: str):
+    """Delete an image from the filesystem"""
+    try:
+        # Get the file path for the image
+        file_path = embedding_store.get_image_path_for_id(id)
+        if not file_path:
+            raise HTTPException(status_code=404, detail=f"Image with id {id} not found")
+
+        # Check if the file exists
+        if not os.path.isfile(file_path):
+            raise HTTPException(status_code=404, detail=f"Image file not found: {file_path}")
+
+        embedding_store.remove_image(id)
+
+        # Delete the file
+        print("not deleting image because dry run:", file_path)
+        # os.remove(file_path)
+
+        return {"message": f"Image {id} deleted successfully", "path": file_path}
+
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete image: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+
 class ImagesByTagsInput(BaseModel):
     tags: List[str]
     match_all: bool = False

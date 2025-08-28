@@ -243,6 +243,11 @@ function DistanceQuery(props: DistanceQueryProps) {
         setEmbeddingInputs([...embeddingInputs, new EmbeddingInputData({id: `distanceQuery-${uuidv4()}`, imageId: image.id})]);
     }
 
+    const handleImageDeleted = (imageId: string) => {
+        console.log("Removing deleted image from results:", imageId);
+        setResultImages(prev => prev.filter(img => img.id !== imageId));
+    };
+
     return <>
         <div className={"gap-4"}>
 
@@ -298,7 +303,7 @@ function DistanceQuery(props: DistanceQueryProps) {
             images={resultImages}
             onSelect={props.setSelectedImages}
             onAddToQuery={handleAddToQuery}
-            //hasMoreResults={hasMoreResults}
+            onImageDeleted={handleImageDeleted}
         />
         {searchIsRunning && (
             <div className="text-center py-4">
