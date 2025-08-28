@@ -31,9 +31,12 @@ class TagsWrangler:
             progress_callback(1)
         return paths
 
-    def get_tags(self, image_path: str) -> list[str]:
-        md = OSXMetaData(image_path)
-        return [t.name for t in md.tags]
+    def get_tags(self, image_path: str) -> list[str]|None:
+        try:
+            md = OSXMetaData(image_path)
+            return [t.name for t in md.tags]
+        except FileNotFoundError:
+            return None
 
     def add_tag(self, image_path, tag_name):
         md = OSXMetaData(image_path)

@@ -16,6 +16,22 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
     const [mode, setMode] = useState<'add' | 'remove' | 'replace' | 'reverse'>('replace');
     const [mouseIsOver, setMouseIsOver] = useState<boolean>(false);
     const [quickLookVisible, setQuickLookVisible] = useState<boolean>(false);
+    const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
+    const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(2); // Default to medium (index 2)
+
+    // Define Tailwind size options - expanded to 8 steps
+    const sizeOptions = [
+        { name: 'XS', class: 'w-16 h-16', minWidth: '4rem' },
+        { name: 'SM', class: 'w-20 h-20', minWidth: '5rem' },
+        { name: 'MD', class: 'w-32 h-32', minWidth: '8rem' },
+        { name: 'LG', class: 'w-48 h-48', minWidth: '12rem' },
+        { name: 'XL', class: 'w-64 h-64', minWidth: '16rem' },
+        { name: '2XL', class: 'w-88 h-88', minWidth: '22rem' },
+        { name: '3XL', class: 'w-112 h-112', minWidth: '28rem' },
+        { name: '4XL', class: 'w-136 h-136', minWidth: '34rem' }
+    ];
+
+    const currentSize = sizeOptions[thumbnailSizeIndex];
 
     // Get the last selected image for Quick Look
     const lastSelectedImage = selectedImages.length > 0 ? selectedImages[selectedImages.length - 1] : null;
@@ -53,7 +69,7 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
             const altIsDown = e.altKey || (e.type === 'keydown' && e.key === 'Alt');
 
             // Handle Space key for Quick Look
-            if (e.type === 'keydown' && e.key === ' ') {
+            if (e.type === 'keydown' && e.key === ' ' && gridHasFocus) {
                 console.log("caught space key, lastSelectedImage:", lastSelectedImage, "quickLookVisible:", quickLookVisible);
                 if (lastSelectedImage && !quickLookVisible) {
                     console.log("showing QuickLook for", lastSelectedImage)
@@ -82,53 +98,79 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
             document.removeEventListener('keydown', updateMode);
             document.removeEventListener('keyup', updateMode);
         };
-    }, [mode, lastSelectedImage, quickLookVisible]);
+    }, [mode, lastSelectedImage, quickLookVisible, gridHasFocus]);
 
     return (
-        <div className={"image-grid border-1 p-4"}
-             onMouseEnter={() => setMouseIsOver(true)}
-             onMouseLeave={() => setMouseIsOver(false)}
-        >
-
-            <Selectable
-                disabled={!mouseIsOver}
-                mode={mode === 'replace' ? 'reverse' : mode}
-                value={selectedImages}
-                onEnd={(newSelectedImages, { added, removed }) => {
-                    switch (mode) {
-                        case 'add':
-                        case 'remove':
-                        case 'reverse':
-                            setSelectedImages(selectedImages.concat(added).filter((i) => !removed.includes(i)));
-                            break;
-                        case 'replace':
-                            setSelectedImages(newSelectedImages)
-                            break
-                    }
-                }}
-            >
-                
-                {props.images.map((img, index) => (
-                    <ResultImage
-                        className={"h-60"}
-                        key={img.id}
-                        image={img}
-                        isSelected={selectedImages.includes(img)}
-                        onClick={(ev) => handleImageClick(ev, img)}
-                        onAddToQuery={() => props.onAddToQuery(img)}
-                        onRevealInFinder={() => handleRevealInFinder(img)}
+        <div>
+            {/* Thumbnail size slider at top right */}
+            <div className="flex justify-between items-center mb-4">
+                <div></div> {/* Empty div to push slider to the right */}
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Size:</span>
+                    <input
+                        type="range"
+                        min="0"
+                        max="7"
+                        step="1"
+                        value={thumbnailSizeIndex}
+                        onChange={(e) => setThumbnailSizeIndex(Number(e.target.value))}
+                        className="w-24 accent-blue-500"
                     />
-                ))}
+                    <span className="text-sm text-gray-600 min-w-[3rem]">{currentSize.name}</span>
+                </div>
+            </div>
+            <div
+                className="grid gap-5 mt-5 p-4 border border-gray-300"
+                style={{
+                    gridTemplateColumns: `repeat(auto-fill, minmax(${currentSize.minWidth}, 1fr))`
+                }}
+                tabIndex={0}
+                onMouseEnter={() => setMouseIsOver(true)}
+                onMouseLeave={() => setMouseIsOver(false)}
+                onFocus={() => setGridHasFocus(true)}
+                onBlur={() => setGridHasFocus(false)}
+                onClick={() => setGridHasFocus(true)}
+            >
+                <Selectable
+                    disabled={!mouseIsOver}
+                    mode={mode === 'replace' ? 'reverse' : mode}
+                    value={selectedImages}
+                    onEnd={(newSelectedImages, { added, removed }) => {
+                        switch (mode) {
+                            case 'add':
+                            case 'remove':
+                            case 'reverse':
+                                setSelectedImages(selectedImages.concat(added).filter((i) => !removed.includes(i)));
+                                break;
+                            case 'replace':
+                                setSelectedImages(newSelectedImages)
+                                break
+                        }
+                    }}
+                >
 
-            </Selectable>
+                    {props.images.map((img, index) => (
+                        <ResultImage
+                            key={img.id}
+                            image={img}
+                            isSelected={selectedImages.includes(img)}
+                            onClick={(ev) => handleImageClick(ev, img)}
+                            onAddToQuery={() => props.onAddToQuery(img)}
+                            onRevealInFinder={() => handleRevealInFinder(img)}
+                            className={currentSize.class}
+                        />
+                    ))}
 
-            {quickLookVisible && lastSelectedImage && (
-                <QuickLookOverlay
-                    image={lastSelectedImage}
-                    onClose={() => setQuickLookVisible(false)}
-                />
-            )}
+                </Selectable>
 
+                {quickLookVisible && lastSelectedImage && (
+                    <QuickLookOverlay
+                        image={lastSelectedImage}
+                        onClose={() => setQuickLookVisible(false)}
+                    />
+                )}
+
+            </div>
         </div>
     );
 }

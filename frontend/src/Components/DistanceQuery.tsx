@@ -19,7 +19,7 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[]>([])
     const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
-    const pageSize = 50;
+    const pageSize = 200;
     const [sortOrder, setSortOrder] = useState<'similarity' | 'semantic_page'>('similarity')
 
     // Search state variables
@@ -220,7 +220,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     useEffect(() => {
         // Attach scroll event listener for infinite scroll
         const handleScroll = () => {
-            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 2000) {
                 // Near bottom of the page, load more results
                 loadMoreResults();
             }

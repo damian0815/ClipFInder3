@@ -49,7 +49,7 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
     const [isBusy, setIsBusy] = useState<boolean>(false);
     const { refetchTags } = useKnownTags();
 
-    async function updateTags() {
+    async function updateDisplayedTags() {
 
         await Promise.all(props.images.map(async (i) => {
             const tags = await getTags(i.id)
@@ -59,8 +59,17 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
         setTags(new Set(allTags));
     }
 
+    async function updateImagesTags(imagesTags: Record<string, string[]>) {
+        Object.entries(imagesTags).forEach(([imageId, tags]) => {
+            const matchingImage = props.images.find((v) => v.id === imageId);
+            if (matchingImage) {
+                matchingImage.tags = tags ?? [];
+            }
+        })
+    }
+
     useEffect(() => {
-        updateTags()
+        updateDisplayedTags()
     }, [props.images]);
 
     async function addTag(images: Image[], tagToAdd: string) {
@@ -87,13 +96,8 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
         //.then(res => res.json())
         .then(data => {
             console.log(data);
-            Object.entries(data['images_tags']).forEach(([imageId, tags]) => {
-                const matchingImage = props.images.find((v) => v.id === imageId);
-                if (matchingImage) {
-                    matchingImage.tags = tags as string[];
-                }
-            })
-            updateTags();
+            updateImagesTags(data['images_tags']);
+            updateDisplayedTags();
             setNewTag(""); // Clear the input after successful add
             // Refresh the known tags list in case a new tag was added
             refetchTags();
@@ -127,13 +131,8 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
         .then(res => res.json())
         .then(data => {
             console.log(data);
-            Object.entries(data['images_tags']).forEach(([imageId, tags]) => {
-                const matchingImage = props.images.find((v) => v.id === imageId);
-                if (matchingImage) {
-                    matchingImage.tags = tags as string[];
-                }
-            })
-            updateTags()
+            updateImagesTags(data['images_tags']);
+            updateDisplayedTags()
         })
         .catch(err => {
             console.error("error deleting tag:", err)
@@ -151,7 +150,7 @@ export function TagEditorSidebar(props: TagEditorSidebarProps) {
         return onAll;
     }
 
-    return <div className="sidebar-content">
+    return <div className="sidebar-content mb-12">
         {props.images.length === 0 ? (
             <p>No images selected</p>
         ) : (
