@@ -20,8 +20,8 @@ type DistanceQueryProps = {
 
 function DistanceQuery(props: DistanceQueryProps) {
 
-    const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[]>([])
-    const [filterInput, setFilterInput] = useState<FilterInputData>(new FilterInputData())
+    const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[] | undefined>(undefined)
+    const [filterInput, setFilterInput] = useState<FilterInputData | undefined>(undefined)
     const pageSize = 200;
     const [sortOrder, setSortOrder] = useState<'similarity' | 'semantic_page'>('similarity')
 
@@ -72,19 +72,25 @@ function DistanceQuery(props: DistanceQueryProps) {
         // Note: We don't automatically trigger the search, let the user click search
     }, []);
 
-    // Optionally restore the most recent search on component mount
+    // Initialize from history on first load (when embeddingInputs is undefined)
     useEffect(() => {
-        if (history.length > 0 && embeddingInputs.length === 0) {
-            // Only restore if we don't have any current inputs and it's the initial load
-            const mostRecent = history[0];
-            console.log('Restoring most recent search on mount:', mostRecent);
-            setEmbeddingInputs(mostRecent.embeddingInputs);
-            setFilterInput(mostRecent.filterInput);
-            setSortOrder(mostRecent.sortOrder);
-            setStatusMessage('Restored most recent search');
-            setTimeout(() => setStatusMessage(null), 2000);
+        if (embeddingInputs === undefined) {
+            if (history.length > 0) {
+                // Restore most recent search
+                const mostRecent = history[0];
+                console.log('Restoring most recent search on initial mount:', mostRecent);
+                setEmbeddingInputs(mostRecent.embeddingInputs);
+                setFilterInput(mostRecent.filterInput);
+                setSortOrder(mostRecent.sortOrder);
+                setStatusMessage('Restored most recent search');
+                setTimeout(() => setStatusMessage(null), 2000);
+            } else {
+                // No history, initialize with empty arrays
+                setEmbeddingInputs([]);
+                setFilterInput(new FilterInputData());
+            }
         }
-    }, [history, embeddingInputs.length]);
+    }, [history, embeddingInputs]);
 
     const cancelSearch = () => {
         if (searchIsRunning) {
@@ -166,7 +172,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     }
 
     const performPage0Search = async () => {
-        if (embeddingInputs.length === 0) {
+        if (!embeddingInputs || !filterInput || embeddingInputs.length === 0) {
             console.log("can't perform search, no inputs")
             return;
         }
@@ -243,7 +249,9 @@ function DistanceQuery(props: DistanceQueryProps) {
             setSearchIsRunning(false);
 
             // Save search to history after successful completion
-            addToHistory(embeddingInputs, filterInput, sortOrder);
+            if (embeddingInputs && filterInput) {
+                addToHistory(embeddingInputs, filterInput, sortOrder);
+            }
 
         } catch (error) {
             setSearchIsRunning(false);
@@ -294,12 +302,14 @@ function DistanceQuery(props: DistanceQueryProps) {
     }, [loadMoreResults]);
 
     const handleDeleteEmbeddingInput = (id: string) => {
+        if (!embeddingInputs) return;
         const newEmbeddingInputs = embeddingInputs.filter(input => input.id !== id);
         console.log("embeddings inputs:", newEmbeddingInputs.map(input => [input.id, input.text ?? 'undefined']));
         setEmbeddingInputs(newEmbeddingInputs);
     }
 
     const handleAddToQuery = (image: Image) => {
+        if (!embeddingInputs) return;
         console.log("adding image to query:", image);
         setEmbeddingInputs([...embeddingInputs, new EmbeddingInputData({id: `distanceQuery-${uuidv4()}`, imageId: image.id})]);
     }
@@ -308,6 +318,11 @@ function DistanceQuery(props: DistanceQueryProps) {
         console.log("Removing deleted image from results:", imageId);
         setResultImages(prev => prev.filter(img => img.id !== imageId));
     };
+
+    // Don't render until initialized
+    if (!embeddingInputs || !filterInput) {
+        return <div>Loading...</div>;
+    }
 
     return <>
         <div className={"gap-4"}>
@@ -322,17 +337,17 @@ function DistanceQuery(props: DistanceQueryProps) {
                     </div>
                 ))}
                 <div className={'w-40 flex-shrink-0 inline-block'}>
-                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs,
+                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs!,
                         new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, text:''})])}>
                         + Add Text Input
                     </button>
-                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs, 
+                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs!, 
                         new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, tags:[]})])}>
                         + Add Tags Input
                     </button>
                 </div>
             </div>
-            <FilterInput initialFilterInput={filterInput} setFilterInput={(d) => setFilterInput(d)} />
+            <FilterInput initialFilterInput={filterInput!} setFilterInput={(d) => setFilterInput(d)} />
             
             {/* Search controls row */}
             <div className={"w-full flex flex-row justify-around items-center gap-2"}>
@@ -350,15 +365,15 @@ function DistanceQuery(props: DistanceQueryProps) {
                     disabled={
                         searchIsRunning || 
                         connectionStatus !== 'connected' ||
-                        embeddingInputs.length === 0 || 
-                        embeddingInputs.filter(input => input.value).length === 0
+                        embeddingInputs!.length === 0 || 
+                        embeddingInputs!.filter(input => input.value).length === 0
                     }
                 >
                     {connectionStatus !== 'connected' 
                         ? `Search (WebSocket ${connectionStatus})`
                         : searchIsRunning 
                         ? 'Searching...' 
-                        : `Search (${embeddingInputs.filter(input => input.value).length} non-empty inputs)`
+                        : `Search (${embeddingInputs!.filter(input => input.value).length} non-empty inputs)`
                     }
                 </button>
                 <button

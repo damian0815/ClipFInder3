@@ -205,8 +205,9 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             except Exception as e:
                 print(f'Caught exception adding {len(missing)} images to clip embeddings (just returning what we have): {repr(e)}')
                 raise
-        have_indices, have_paths = zip(*[(i, p) for i, p in enumerate(self.image_paths) if p in paths])
-        have_indices = list(have_indices)
+        image_paths_reverse_lookup = {p: i for i, p in enumerate(self.image_paths)}
+        have_indices = [image_paths_reverse_lookup[p] for p in paths if p in image_paths_reverse_lookup]
+        have_paths = [p for p in paths if p in image_paths_reverse_lookup]
         return have_paths, self.image_embeddings[have_indices]
 
     def get_text_embedding(self, text: str) -> torch.Tensor:
@@ -219,6 +220,11 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
 
     def search_images(self, query: Query, progress_callback: Callable[[float, str], None] = None) -> List[QueryResult]:
         weights = list(query.weights)
+        inputs_counts = [len(query.embeddings) if query.embeddings else 0,
+                                len(query.texts) if query.texts else 0,
+                                len(query.image_ids) if query.image_ids else 0]
+        if len(weights) != sum(inputs_counts):
+            raise ValueError(f"there must be 1 weight for every embedding, text, or image in the query (got {inputs_counts} inputs (total {sum(inputs_counts)} and {len(weights)} weights)")
         if progress_callback is not None:
             progress_callback(0, "Computing embeddings")
         all_query_embeddings = [
@@ -226,15 +232,15 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             for t in query.texts
         ]
         if query.image_ids:
+            image_paths = [self.get_image_path_for_id(i) for i in query.image_ids]
+            missing_image_indices = [i for i, path in enumerate(image_paths)
+                                     if path is None]
+            actual_paths, image_embeddings = self.get_image_embeddings(image_paths)
+            missing_image_indices += [i for i, path in enumerate(image_paths)
+                                   if path not in actual_paths]
             weight_index_offset = len(all_query_embeddings)
-            id_paths = [i for i in [self.get_image_path_for_id(i) for i in query.image_ids]
-                            if i is not None]
-            actual_paths, image_embeddings = self.get_image_embeddings(id_paths)
-            missing_image_indices = [weight_index_offset + i
-                                   for i, p in enumerate(id_paths)
-                                   if p not in actual_paths]
-            for index in reversed(missing_image_indices):
-                del weights[index]
+            for index in sorted(missing_image_indices, reverse=True):
+                del weights[weight_index_offset + index]
             all_query_embeddings.append(image_embeddings)
 
         if query.embeddings:
@@ -247,7 +253,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             return []
         all_query_embeddings = torch.cat(all_query_embeddings, dim=0).to(self.image_embeddings.device, dtype=self.image_embeddings.dtype)
         if all_query_embeddings.shape[0] != len(weights):
-            raise ValueError(f"there must be 1 weight for every embedding, text, or image in the query (got {all_query_embeddings.shape[0]} embeddings and {len(weights)} weights)")
+            raise RuntimeError(f"Bad weight editing (have {all_query_embeddings.shape[0]} embeddings and {len(weights)} weights)")
         all_query_embeddings /= all_query_embeddings.norm(dim=-1, keepdim=True)
         weights = torch.tensor(weights).to(all_query_embeddings.device, dtype=all_query_embeddings.dtype)
 

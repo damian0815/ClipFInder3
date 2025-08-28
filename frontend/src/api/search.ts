@@ -11,6 +11,7 @@ export interface SearchParams {
     // Pagination parameters
     offset?: number;
     limit?: number;
+    sort_order?: 'similarity' | 'semantic_page'
 }
 
 export interface SearchResult {
@@ -52,7 +53,7 @@ export async function startSearchWithTaskId(searchParams: SearchParams, taskId: 
             throw new Error(`HTTP error! status: ${response.status}, body: ${JSON.stringify(responseJson)}`);
         }
         console.log("search started successfully:", response);
-        
+
     } catch (error) {
         console.error('Error starting search:', error);
         throw error;
