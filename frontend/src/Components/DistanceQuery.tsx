@@ -11,6 +11,8 @@ import {getImageIdsForTagsAsync as startGetImageIdsForTagsAsync} from "@/api";
 import {useProgressWebSocketContext} from "@/contexts/ProgressWebSocketContext";
 import {useSearchHistory, SearchHistoryEntry} from "@/hooks/useSearchHistory";
 import {SearchHistoryDropdown} from "@/Components/SearchHistoryDropdown";
+import { Button } from "@/Components/ui/Button.tsx";
+import { Card, CardContent } from "@/Components/ui/Card.tsx";
 
 
 type DistanceQueryProps = {
@@ -359,39 +361,51 @@ function DistanceQuery(props: DistanceQueryProps) {
         return <div>Loading...</div>;
     }
 
-    return <>
-        <div className={"gap-4"}>
-
-            <div className={'flex flex-wrap gap-4 w-full'}>
-                {embeddingInputs.map((input, index) => (
-                    <div key={input.id} className={"w-80 flex-shrink-0"}>
-                        <EmbeddingInput 
-                            id={input.id}
-                            mode={input.mode}
-                            value={input.value}
-                            weight={input.weight}
-                            imageId={input.imageId}
-                            onValueChange={(newValue) => handleEmbeddingValueChange(index, newValue)}
-                            onWeightChange={(newWeight) => handleEmbeddingWeightChange(index, newWeight)}
-                            onDeleteClicked={(id) => handleDeleteEmbeddingInput(id)}
-                            onQueryRequested={performPage0Search} />
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardContent className="p-6">
+                    <div className="flex flex-wrap gap-4 w-full mb-6">
+                        {embeddingInputs.map((input, index) => (
+                            <div key={input.id} className="w-80 flex-shrink-0">
+                                <EmbeddingInput 
+                                    id={input.id}
+                                    mode={input.mode}
+                                    value={input.value}
+                                    weight={input.weight}
+                                    imageId={input.imageId}
+                                    onValueChange={(newValue) => handleEmbeddingValueChange(index, newValue)}
+                                    onWeightChange={(newWeight) => handleEmbeddingWeightChange(index, newWeight)}
+                                    onDeleteClicked={(id) => handleDeleteEmbeddingInput(id)}
+                                    onQueryRequested={performPage0Search} />
+                            </div>
+                        ))}
+                        <div className="flex flex-col gap-3 w-48 flex-shrink-0">
+                            <Button 
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => setEmbeddingInputs([...embeddingInputs!,
+                                    new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, text:''})])}
+                            >
+                                + Add Text Input
+                            </Button>
+                            <Button 
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => setEmbeddingInputs([...embeddingInputs!, 
+                                    new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, tags:[]})])}
+                            >
+                                + Add Tags Input
+                            </Button>
+                        </div>
                     </div>
-                ))}
-                <div className={'w-40 flex-shrink-0 inline-block'}>
-                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs!,
-                        new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, text:''})])}>
-                        + Add Text Input
-                    </button>
-                    <button className={"btn btn-primary border rounded w-full"} onClick={() => setEmbeddingInputs([...embeddingInputs!, 
-                        new EmbeddingInputData({id:`distanceQuery-${uuidv4()}`, tags:[]})])}>
-                        + Add Tags Input
-                    </button>
-                </div>
-            </div>
-            <FilterInput initialFilterInput={filterInput!} setFilterInput={(d) => setFilterInput(d)} />
+                    
+                    <FilterInput initialFilterInput={filterInput!} setFilterInput={(d) => setFilterInput(d)} />
+                </CardContent>
+            </Card>
             
             {/* Search controls row */}
-            <div className={"w-full flex flex-row justify-around items-center gap-2"}>
+            <div className="w-full flex flex-row justify-around items-center gap-4 p-4 bg-slate-50 rounded-lg">
                 <SearchHistoryDropdown
                     history={history}
                     onSelectEntry={restoreFromHistory}
@@ -400,8 +414,8 @@ function DistanceQuery(props: DistanceQueryProps) {
                     className="w-1/4"
                 />
                 
-                <button
-                    className={"btn btn-primary border rounded w-1/4 h-10 mt-1"}
+                <Button
+                    className="w-1/4"
                     onClick={performPage0Search}
                     disabled={
                         searchIsRunning || 
@@ -416,12 +430,15 @@ function DistanceQuery(props: DistanceQueryProps) {
                         ? 'Searching...' 
                         : `Search (${embeddingInputs!.filter(input => input.value).length} non-empty inputs)`
                     }
-                </button>
-                <button
-                    className={"btn btn-primary border rounded w-1/4 h-10 mt-1"}
+                </Button>
+                <Button
+                    variant="outline"
+                    className="w-1/4"
                     onClick={cancelSearch}
                     disabled={!searchIsRunning}
-                >Cancel search</button>
+                >
+                    Cancel search
+                </Button>
                 
                 <select
                     className={"border rounded px-2 py-1 w-1/4"}
@@ -438,25 +455,31 @@ function DistanceQuery(props: DistanceQueryProps) {
             {statusMessage && (
                 <div className="text-green-600 mt-2">{statusMessage}</div>
             )}
+            
+            <div className="text-sm text-slate-500">
+                Current offset: {currentSearchParams?.offset ?? "<undefined>"}
+            </div>
+            
+            <ImageResultsGrid
+                images={resultImages}
+                onSelect={props.setSelectedImages}
+                onAddToQuery={handleAddToQuery}
+                onImageDeleted={handleImageDeleted}
+            />
+            
+            {searchIsRunning && (
+                <div className="text-center py-4">
+                    <div className="text-slate-600">Loading more results...</div>
+                </div>
+            )}
+            
+            {!hasMoreResults && resultImages.length > 0 && (
+                <div className="text-center py-4">
+                    <div className="text-slate-500 text-sm">No more results</div>
+                </div>
+            )}
         </div>
-        <div>Current offset: {currentSearchParams?.offset ?? "<undefined>"}</div>
-        <ImageResultsGrid
-            images={resultImages}
-            onSelect={props.setSelectedImages}
-            onAddToQuery={handleAddToQuery}
-            onImageDeleted={handleImageDeleted}
-        />
-        {searchIsRunning && (
-            <div className="text-center py-4">
-                <div className="text-gray-600">Loading more results...</div>
-            </div>
-        )}
-        {!hasMoreResults && resultImages.length > 0 && (
-            <div className="text-center py-4">
-                <div className="text-gray-500 text-sm">No more results</div>
-            </div>
-        )}
-    </>
+    );
 
 
 }

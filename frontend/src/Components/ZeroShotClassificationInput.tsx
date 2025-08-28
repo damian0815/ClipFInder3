@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import CLIPEmbeddingInput from './CLIPEmbeddingInput.tsx';
 import "../App.css"
 import {EmbeddingInputData} from "@/Datatypes/EmbeddingInputData.tsx";
+import { Button } from "@/Components/ui/Button.tsx";
 
 export class ZeroShotClassificationInputData {
   classes: EmbeddingInputData[] = []
@@ -22,10 +23,10 @@ export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputPr
 
   const addClass = () => {
     setQuery({
-      classes: [...query.classes, {
+      classes: [...query.classes, new EmbeddingInputData({
         id: getClassId(query.classes.length),
-        texts: ['']
-      }],
+        text: ''
+      })],
     });
   };
 
@@ -52,15 +53,17 @@ export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputPr
   };
 
   return (
-      <div className="space-y-4 w-19/20">
+      <div className="space-y-4">
         {query.classes.map((clipInput, index) => (
-          <div key={index} className="relative">
-            <button
+          <div key={index} className="relative bg-white rounded-lg border border-slate-200 p-4">
+            <Button
                 onClick={() => removeClass(index)}
-                className="absolute -right-10 top-2 p-2 text-gray-400 hover:text-red-500"
+                variant="ghost"
+                size="icon"
+                className="absolute -right-2 -top-2 h-8 w-8 text-slate-400 hover:text-red-500"
             >
-              <Trash2 size={20}/>
-            </button>
+              <Trash2 size={16}/>
+            </Button>
             <CLIPEmbeddingInput
                 id={getClassId(index)}
                 value={clipInput}
@@ -69,13 +72,14 @@ export const ZeroShotClassificationInput = (props: ZeroShotClassificationInputPr
           </div>
       ))}
 
-        <button
+        <Button
             onClick={addClass}
-            className="w-full px-4 py-2 border rounded-md hover:bg-gray-50 flex items-center justify-center"
+            variant="outline"
+            className="w-full"
         >
-          <Plus size={20} className="mr-2"/>
+          <Plus size={16} className="mr-2"/>
           Add Class
-        </button>
+        </Button>
       </div>
   );
 };

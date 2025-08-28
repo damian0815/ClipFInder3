@@ -12,6 +12,8 @@
   "dependencies": {
     "@radix-ui/react-context-menu": "^2.2.16",
     "@tailwindcss/vite": "^4.0.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "common-path": "^1.0.1",
     "lucide-react": "^0.475.0",
     "react": "^18.2.0",
@@ -24,6 +26,7 @@
     "react-tageditor": "^0.2.3",
     "react-zoom-pan": "^0.1.48",
     "react-zoom-pan-pinch": "^3.7.0",
+    "tailwind-merge": "^3.3.1",
     "uuid": "^11.0.5"
   },
   "devDependencies": {

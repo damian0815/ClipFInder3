@@ -8,7 +8,7 @@ import MultiColumn from "@/Components/MultiColumn.tsx";
 import Image from "@/types/image";
 import {FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import {FilterInput} from "@/Components/FilterInput.tsx";
-import { i } from "node_modules/vite/dist/node/types.d-aGj9QkWt";
+import { Button } from "@/Components/ui/Button.tsx";
 
 type ZeroShotClassificationQueryProps = {
     setSelectedImages: (images: Image[]) => void;
@@ -111,15 +111,21 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         throw new Error("Function not implemented.");
     }
 
-    return <>
-        <ZeroShotClassificationInput initialQuery={getLastQuery()} setQuery={setQueryInput}/>
-        <FilterInput initialFilterInput={getLastFilter()} setFilterInput={setFilterInput} />
-        <button
-            onClick={() => {doSearch()}}
-            disabled={queryInProgress}
-            >{queryInProgress ? "⏳ Searching..." : "🔎 Search"}</button>
-        {/*<!--<ImageResultsGrid images={images} onSelect={handleSelect}/>-->*/}
-        <pre>{JSON.stringify(queryInput?.classes)}</pre>
+    return (
+        <div className="space-y-6">
+            <ZeroShotClassificationInput initialQuery={getLastQuery()} setQuery={setQueryInput}/>
+            <FilterInput initialFilterInput={getLastFilter()} setFilterInput={setFilterInput} />
+            <div className="flex justify-center">
+                <Button
+                    onClick={() => {doSearch()}}
+                    disabled={queryInProgress}
+                    className="px-8"
+                >
+                    {queryInProgress ? "⏳ Searching..." : "🔎 Search"}
+                </Button>
+            </div>
+            {/*<!--<ImageResultsGrid images={images} onSelect={handleSelect}/>-->*/}
+            <pre className="text-xs bg-slate-100 p-2 rounded">{JSON.stringify(queryInput?.classes)}</pre>
         {queryInput && (queryResults.length > 0) && <>
             <MultiColumn columns={resultClasses.length} >
                     {resultClasses.map((clsId) => {
@@ -142,9 +148,8 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
                                 */}
             </>
         }
-
-
-    </>
+        </div>
+    );
 }
 
 

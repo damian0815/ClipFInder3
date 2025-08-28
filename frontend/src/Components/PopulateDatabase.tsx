@@ -1,6 +1,8 @@
 import {useState} from "react";
 import {API_BASE_URL} from "../Constants.tsx";
 import TestProgress from "./TestProgress.tsx";
+import { Button } from "@/Components/ui/Button.tsx";
+import { Input } from "@/Components/ui/Input.tsx";
 
 function PopulateDatabase() {
     const [imageDir, setImageDir] = useState<string>('');
@@ -33,37 +35,25 @@ function PopulateDatabase() {
         })
     }
 
-    return <>
-        <input
-            type="text"
-            placeholder="Image directory path..."
-            value={imageDir}
-            onChange={(e) => setImageDir(e.target.value)}
-            style={{
-                padding: '8px',
-                marginBottom: '10px',
-                fontSize: '16px',
-                borderRadius: '4px',
-                border: '1px solid #ccc',
-                width: '100%'
-            }}
-        />
-        <button
-            onClick={populateDatabase}
-            disabled={isPopulating}
-            style={{
-                padding: '8px 16px',
-                marginBottom: '20px',
-                fontSize: '16px',
-                borderRadius: '4px',
-                border: '1px solid #ccc',
-                cursor: 'pointer'
-            }}
-        >
-            Populate Database
-        </button>
-        <TestProgress />
-    </>
+    return (
+        <div className="space-y-4">
+            <Input
+                type="text"
+                placeholder="Image directory path..."
+                value={imageDir}
+                onChange={(e) => setImageDir(e.target.value)}
+                className="w-full"
+            />
+            <Button
+                onClick={populateDatabase}
+                disabled={isPopulating}
+                className="w-full"
+            >
+                {isPopulating ? 'Populating...' : 'Populate Database'}
+            </Button>
+            <TestProgress />
+        </div>
+    );
 
 
 }
