@@ -16,7 +16,7 @@ export class EmbeddingInputData {
         this.imageId = imageId
         this.tags = tags
         this.weight = weight
-        console.log('made EmbeddingInputData:', this, 'mode:', this.mode, 'value:', this.value)
+        //console.log('made EmbeddingInputData:', this, 'mode:', this.mode, 'value:', this.value)
     }
     get mode(): 'text' | 'image' | 'tags' {
         if (this.text !== undefined) return 'text';

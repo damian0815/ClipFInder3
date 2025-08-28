@@ -11,6 +11,7 @@ const useContextMenu = () => {
 
   const handleContextMenu = useCallback(
     (event: MouseEvent) => {
+      console.warn("useContextMenu suppressing default for mouse event")
       event.preventDefault();
       setAnchorPoint({ x: event.pageX, y: event.pageY });
       setIsShow(true);

@@ -65,16 +65,19 @@ export function TagTextInput(props: TagTextInputProps) {
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (showSuggestions && filteredSuggestions.length > 0) {
             if (e.key === 'ArrowDown') {
+                console.warn("TagTextInput caught and suppressing keydown event for arrow down")
                 e.preventDefault();
                 setSelectedIndex(prev => 
                     prev < filteredSuggestions.length - 1 ? prev + 1 : 0
                 );
             } else if (e.key === 'ArrowUp') {
+                console.warn("TagTextInput caught and suppressing keydown event for arrow up")
                 e.preventDefault();
                 setSelectedIndex(prev => 
                     prev > 0 ? prev - 1 : filteredSuggestions.length - 1
                 );
             } else if (e.key === 'Enter') {
+                console.warn("TagTextInput caught and suppressing keydown event for enter")
                 e.preventDefault();
                 if (selectedIndex >= 0 && selectedIndex < filteredSuggestions.length) {
                     selectSuggestion(filteredSuggestions[selectedIndex]);
@@ -82,6 +85,7 @@ export function TagTextInput(props: TagTextInputProps) {
                     selectSuggestion(filteredSuggestions[0]);
                 }
             } else if (e.key === 'Escape') {
+                console.warn("TagTextInput caught and suppressing keydown event for escape")
                 setShowSuggestions(false);
                 setSelectedIndex(-1);
             }

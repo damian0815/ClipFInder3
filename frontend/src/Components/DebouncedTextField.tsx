@@ -9,14 +9,19 @@ type DebouncedTextFieldProps = {
 
 function DebouncedTextField(props: DebouncedTextFieldProps) {
 
-  const [value, setValue] = useState<string>(props.value || '');
+  const [value, setValue] = useState<string>(props.value);
+
+  // Update internal state when props.value changes
+  useEffect(() => {
+    setValue(props.value);
+  }, [props.value]);
 
   useEffect(() => {
       const timeoutId = setTimeout(() => {
         props.setDebouncedValue(value);
       }, 500);
       return () => clearTimeout(timeoutId);
-    }, [value]);
+    }, [value, props]);
 
 
     return <>

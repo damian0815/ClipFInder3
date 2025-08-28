@@ -50,6 +50,41 @@ function DistanceQuery(props: DistanceQueryProps) {
     // Search history functionality
     const { history, addToHistory, removeFromHistory, clearHistory } = useSearchHistory();
 
+    // Immutable update functions for embedding inputs
+    const handleEmbeddingValueChange = useCallback((index: number, newValue: string) => {
+        setEmbeddingInputs(prev => {
+            if (!prev) return prev;
+            return prev.map((input, i) => {
+                if (i === index) {
+                    const newInput = new EmbeddingInputData({
+                        id: input.id,
+                        text: input.mode === 'text' ? newValue : input.text,
+                        imageId: input.mode === 'image' ? newValue : input.imageId,
+                        tags: input.mode === 'tags' ? newValue.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : input.tags,
+                        weight: input.weight
+                    });
+                    return newInput;
+                }
+                return input;
+            });
+        });
+    }, []);
+
+    const handleEmbeddingWeightChange = useCallback((index: number, newWeight: number) => {
+        setEmbeddingInputs(prev => {
+            if (!prev) return prev;
+            return prev.map((input, i) => 
+                i === index ? new EmbeddingInputData({
+                    id: input.id,
+                    text: input.text,
+                    imageId: input.imageId,
+                    tags: input.tags,
+                    weight: newWeight
+                }) : input
+            );
+        });
+    }, []);
+
     const restoreFromHistory = useCallback((entry: SearchHistoryEntry) => {
         console.log('Restoring search from history:', entry);
         
@@ -328,11 +363,17 @@ function DistanceQuery(props: DistanceQueryProps) {
         <div className={"gap-4"}>
 
             <div className={'flex flex-wrap gap-4 w-full'}>
-                {embeddingInputs.map((input) => (
+                {embeddingInputs.map((input, index) => (
                     <div key={input.id} className={"w-80 flex-shrink-0"}>
                         <EmbeddingInput 
-                            embeddingInput={input} 
-                            onDeleteClicked={(_) => handleDeleteEmbeddingInput(input.id)}
+                            id={input.id}
+                            mode={input.mode}
+                            value={input.value}
+                            weight={input.weight}
+                            imageId={input.imageId}
+                            onValueChange={(newValue) => handleEmbeddingValueChange(index, newValue)}
+                            onWeightChange={(newWeight) => handleEmbeddingWeightChange(index, newWeight)}
+                            onDeleteClicked={(id) => handleDeleteEmbeddingInput(id)}
                             onQueryRequested={performPage0Search} />
                     </div>
                 ))}
