@@ -19,17 +19,7 @@ function EmbeddingInput(props: EmbeddingInputProps) {
     const [value, setValue] = useState<string>(props.embeddingInput.value)
 
     useEffect(() => {
-        switch (props.embeddingInput.mode) {
-            case 'text':
-                props.embeddingInput.text = value;
-                break;
-            case 'image':
-                props.embeddingInput.imageId = value;
-                break;
-            case 'tags':
-                props.embeddingInput.tags = value.split(',');
-                break;
-        }
+        props.embeddingInput.value = value
     }, [value])
 
     return <div className={'w-45'}>

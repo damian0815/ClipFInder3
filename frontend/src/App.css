@@ -18,10 +18,6 @@
     border-radius: 0;
   }
 
-  .image-grid img {
-    height: 200px
-  }
-
   .image-2d img:hover {
     /*z-index:555555;*/
     background: blue;

@@ -39,26 +39,31 @@ export function QuickLookOverlay({ image, onClose }: QuickLookOverlayProps) {
 
     return (
         <div
-            className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center w-full h-full"
+            style={{ zIndex: 9999, position: 'fixed' }}
             onClick={handleBackdropClick}
         >
-            <div className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+            <div className="relative w-full h-full flex items-center justify-center p-4">
                 <img
                     src={`${API_BASE_URL}/api/image/${image.id}`}
                     alt={image.path}
-                    className="max-w-full max-h-full object-contain shadow-2xl"
+                    className="w-full h-full object-contain shadow-2xl"
                 />
 
                 {/* Close button */}
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 text-white text-2xl bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-70 transition-colors"
+                    style={{ zIndex: 10000 }}
                 >
                     ×
                 </button>
 
                 {/* Image info */}
-                <div className="absolute bottom-4 left-4 right-4 text-white bg-black bg-opacity-50 rounded p-3">
+                <div
+                    className="absolute bottom-4 left-4 right-4 text-white bg-black bg-opacity-50 rounded p-3"
+                    style={{ zIndex: 10000 }}
+                >
                     <div className="text-sm font-medium truncate">{image.path}</div>
                     {image.distance !== undefined && (
                         <div className="text-xs text-gray-300">Distance: {image.distance.toFixed(3)}</div>

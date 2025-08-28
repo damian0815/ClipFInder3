@@ -34,6 +34,19 @@ export class EmbeddingInputData {
                 return this.tags?.join(',') ?? '';
         }
     }
+    set value(v: string) {
+        switch (this.mode) {
+            case 'text':
+                this.text = v;
+                break;
+            case 'image':
+                this.imageId = v;
+                break;
+            case 'tags':
+                this.tags = v.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+                break;
+        }
+    }
 }
 
 export class FilterInputData {

@@ -245,7 +245,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             return []
         all_embeddings = torch.cat(all_embeddings, dim=0).to(self.image_embeddings.device, dtype=self.image_embeddings.dtype)
         if all_embeddings.shape[0] != len(weights):
-            raise ValueError("there must be 1 weight for every embedding, text, or image in the query")
+            raise ValueError(f"there must be 1 weight for every embedding, text, or image in the query (got {all_embeddings.shape[0]} embeddings and {len(weights)} weights)")
         all_embeddings /= all_embeddings.norm(dim=-1, keepdim=True)
         weights = torch.tensor(weights).to(all_embeddings.device, dtype=all_embeddings.dtype)
 

@@ -64,7 +64,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                 await startSearchWithTaskId(searchParams, taskId);
 
                 // Wait for the search to complete and get results from taskData
-                while (taskData.data === undefined) {
+                while (!taskData.data) {
                     // Check if search was cancelled using ref instead of state
                     if (searchCancelledRef.current) {
                         throw new Error("Search cancelled");
@@ -73,6 +73,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
 
+                console.log('search completed, got results:', taskData);
                 return taskData.data;
             });
 
@@ -99,6 +100,24 @@ function DistanceQuery(props: DistanceQueryProps) {
         }
     };
 
+    const getImageIdsForTags = async (tags: string[]): Promise<string[]> => {
+        const taskResult = await taskManager.runTask(async (taskId, taskData) => {
+            console.log("running image ids for tags task, id=", taskId)
+            await startGetImageIdsForTagsAsync(tags, taskId, true);
+            while (taskData.data === undefined) {
+                if (searchCancelledRef.current) {
+                    throw new Error("Search cancelled");
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            return taskData.data ?? []
+        });
+        if (taskResult.error) {
+            throw new Error("Error fetching negative tags: " + taskResult.error);
+        }
+        return taskResult.data as string[];
+    }
+
     const performPage0Search = async () => {
         if (embeddingInputs.length === 0) {
             console.log("can't perform search, no inputs")
@@ -116,56 +135,45 @@ function DistanceQuery(props: DistanceQueryProps) {
         setResultImages([]);
 
         try {
+
             // Get fresh filter state for tag filtering
             var excludedImageIds: string[] | undefined = undefined;
             var requiredImageIds: string[] | undefined = undefined;
 
             // Tag filtering logic (same as before)
             if ((filterInput.negativeTags ?? "").trim().length > 0) {
-                const taskResult = await taskManager.runTask(async (taskId, taskData) => {
-                    console.log("running negative tags task, id=", taskId)
-                    const negativeTags = filterInput.negativeTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
-                    await startGetImageIdsForTagsAsync(negativeTags, taskId, true);
-                    while (taskData.data === undefined) {
-                        if (searchCancelledRef.current) {
-                            throw new Error("Search cancelled");
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                    return taskData.data ?? []
-                });
-                if (taskResult.error) {
-                    console.error("Error fetching negative tags:", taskResult.error);
-                    return;
-                }
-                excludedImageIds = taskResult.data as string[]
+                excludedImageIds = await getImageIdsForTags(filterInput.negativeTags!.split(',').map(t => t.trim()).filter(t => t.length > 0));
             }
 
             if ((filterInput.positiveTags ?? "").trim().length > 0) {
-                const taskResult = await taskManager.runTask(async (taskId, taskData) => {
-                    const positiveTags = filterInput.positiveTags!.split(',').map(t => t.trim()).filter(t => t.length > 0);
-                    await startGetImageIdsForTagsAsync(positiveTags, taskId, true);
-                    while (taskData.data === undefined) {
-                        if (searchCancelledRef.current) {
-                            throw new Error("Search cancelled");
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                    return taskData.data ?? []
-                });
-                if (taskResult.error) {
-                    console.error("Error fetching positive tags:", taskResult.error);
-                    return;
-                }
-                requiredImageIds = taskResult.data as string[]
+                requiredImageIds = await getImageIdsForTags(filterInput.positiveTags!.split(',').map(t => t.trim()).filter(t => t.length > 0));
             }
+
+            // Prepare inputs + weights
+            const textInputs = embeddingInputs.filter(input => input.mode === 'text' && input.text && input.text.trim().length > 0);
+            const texts = textInputs.map(input => input.text!);
+            const textWeights = textInputs.map(input => input.weight);
+
+            const imageInputs = embeddingInputs.filter(input => input.mode === 'image' && input.imageId);
+            const imageIds = imageInputs.map(input => input.imageId) as string[]
+            const imageWeights = imageInputs.map(input => input.weight) as number[]
+
+            const tagInputs = embeddingInputs.filter(input => input.mode === 'tags' && input.tags && input.tags.length > 0);
+            // For tags, we need to fetch image IDs for each tag input
+            for (const input of tagInputs) {
+                const tagImageIds = await getImageIdsForTags(input.tags!);
+                imageIds.push(...tagImageIds);
+                // weight should be spread across all images for this tag
+                imageWeights.push(...Array(tagImageIds.length).fill(input.weight/tagImageIds.length));
+            }
+
+            const weights = [...textWeights, ...imageWeights];
 
             // Build and store search params for pagination
             const searchParams: SearchParams = {
-                texts: embeddingInputs.filter(input => input.mode === 'text').map(input => input.text).filter(Boolean) as string[],
-                image_ids: embeddingInputs.filter(input => input.mode === 'image').map(input => input.imageId).filter(Boolean) as string[],
-                tags: embeddingInputs.filter(input => input.mode === 'tags').map(input => input.tags).filter(Boolean) as string[][],
-                weights: embeddingInputs.map(input => input.weight),
+                texts: texts,
+                image_ids: imageIds,
+                weights: weights,
                 required_path_contains: filterInput.positivePathContains,
                 excluded_path_contains: filterInput.negativePathContains,
                 excluded_image_ids: excludedImageIds,

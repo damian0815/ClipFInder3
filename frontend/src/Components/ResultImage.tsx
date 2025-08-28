@@ -61,6 +61,7 @@ export function CorpusImage({id, alt=''}: {
 } ) {
   return (
     <img
+        className={"h-full w-full"}
       src={`${API_BASE_URL}/api/thumbnail/${id}`}
       alt={alt}
     />

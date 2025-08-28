@@ -110,6 +110,7 @@ function ImageResultsGrid(props: ImageResultsGridProps) {
                 
                 {props.images.map((img, index) => (
                     <ResultImage
+                        className={"h-60"}
                         key={img.id}
                         image={img}
                         isSelected={selectedImages.includes(img)}
