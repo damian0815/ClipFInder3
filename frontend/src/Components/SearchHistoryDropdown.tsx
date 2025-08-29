@@ -30,6 +30,11 @@ export function SearchHistoryDropdown({
 
         const parts = [];
         
+        // Add search method prefix if it's a direction search
+        if (entry.searchMethod === 'direction') {
+            parts.push('📐 Direction:');
+        }
+        
         // Add embedding inputs summary
         if (entry.embeddingInputs.length > 0) {
             const textInputs = entry.embeddingInputs.filter(input => input.text);

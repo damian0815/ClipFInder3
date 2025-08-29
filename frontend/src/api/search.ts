@@ -1,8 +1,10 @@
 import {API_BASE_URL} from "@/Constants.tsx";
+import { SortOrder } from "@/types/searchResults";
 
 export interface SearchParams {
     texts?: string[];
     image_ids?: string[];
+    embeddings?: number[][];
     weights?: number[];
     required_path_contains?: string;
     excluded_path_contains?: string;
@@ -50,12 +52,49 @@ export async function startSearchWithTaskId(searchParams: SearchParams, taskId: 
         if (!response.ok) {
             const responseJson = await response.json()
             console.error("search failed: ", responseJson)
-            throw new Error(`HTTP error! status: ${response.status}, body: ${JSON.stringify(responseJson)}`);
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-        console.log("search started successfully:", response);
+        
+        const data = await response.json();
+        console.log("search started successfully:", data);
+        return data;
 
     } catch (error) {
         console.error('Error starting search:', error);
+        throw error;
+    }
+}
+
+/**
+ * Gets embeddings for texts/images using the backend
+ * @param texts Optional array of texts to embed
+ * @param image_ids Optional array of image IDs to embed  
+ * @param reduction Reduction method (e.g., 'mean_norm')
+ * @returns Promise that resolves to embedding array
+ */
+export async function getEmbeddings(texts?: string[], image_ids?: string[], reduction: string = 'mean_norm'): Promise<number[]> {
+    try {
+        const body: any = { reduction };
+        if (texts && texts.length > 0) body.texts = texts;
+        if (image_ids && image_ids.length > 0) body.image_ids = image_ids;
+
+        //console.log("Requesting embeddings with body:", body);
+        const response = await fetch(`${API_BASE_URL}/api/embeddings`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}, body: ${await response.text()}`);
+        }
+
+        const data = await response.json();
+        return data.embedding;
+    } catch (error) {
+        console.error('Error fetching embeddings:', error);
         throw error;
     }
 }

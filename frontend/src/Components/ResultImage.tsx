@@ -58,7 +58,7 @@ export function ResultImage(props: ResultImageProps) {
               alt={props.image.path}
             />
           </div>
-          <ContextMenu.Content className="bg-gray-100 border border-gray-300 rounded-md shadow-lg p-1 min-w-[140px]">
+          <ContextMenu.Content className="bg-gray-100 border border-gray-300 rounded-md shadow-lg p-1 min-w-[140px] z-100">
             <ContextMenu.Item
               className="px-3 py-2 text-sm hover:bg-blue-100 rounded cursor-pointer"
               onClick={() => props.onAddToQuery(props.image)}

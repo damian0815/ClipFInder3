@@ -34,7 +34,7 @@ class Query(BaseModel):
     limit: int = 100
     sort_order: Literal['similarity', 'similarity_asc', 
                         'similarity_max', 'similarity_max_asc', 
-                        'direction', 'semantic_page'] = 'similarity'
+                        'direction', 'direction_rev', 'semantic_page'] = 'similarity'
 
     @staticmethod
     def text_query(text: str):
@@ -235,10 +235,12 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             raise ValueError(f"there must be 1 weight for every embedding, text, or image in the query (got {inputs_counts} inputs (total {sum(inputs_counts)} and {len(weights)} weights)")
         if progress_callback is not None:
             progress_callback(0, "Computing embeddings")
-        all_query_embeddings = [
-            self.get_text_embedding(t).unsqueeze(0)
-            for t in query.texts
-        ]
+        all_query_embeddings = []
+        if query.texts:
+            all_query_embeddings.extend([
+                self.get_text_embedding(t).unsqueeze(0)
+                for t in query.texts
+            ])
         if query.image_ids:
             image_paths = [self.get_image_path_for_id(i) for i in query.image_ids]
             missing_image_indices = [i for i, path in enumerate(image_paths)
@@ -252,10 +254,13 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             all_query_embeddings.append(image_embeddings)
 
         if query.embeddings:
-            all_query_embeddings.extend([torch.tensor(e) for e in query.embeddings])
+            if any(len(t.shape) != 1 for t in all_query_embeddings) or any(
+                    t.shape[0] != self.clip_model.embedding_dim for t in all_query_embeddings):
+                raise ValueError("all query embeddings must be of shape [embedding_dim]")
+            all_query_embeddings.extend([torch.tensor([e]) for e in query.embeddings])
 
-        if any(len(t.shape) != 2 for t in all_query_embeddings):
-            raise ValueError("all query embeddings must be of shape [1, embedding_dim]")
+        if any(len(t.shape) != 2 for t in all_query_embeddings) or any(t.shape[1] != self.clip_model.embedding_dim for t in all_query_embeddings):
+            raise RuntimeError("something went wrong: all finalized embeddings must be of shape [1, embedding_dim]")
         if len(all_query_embeddings) == 0:
             print("Empty query, returning no results")
             return []
@@ -310,14 +315,24 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         if progress_callback is not None:
             progress_callback(0.25, "Computing similarities")
 
-        similarities = torch.matmul(all_query_embeddings, corpus_embeddings.T)
-        weighted_similarities = (similarities.T * weights).T
-        if query.sort_order == 'similarity_max' or query.sort_order == 'similarity_max_asc':
-            summed_similarities, _ = weighted_similarities.max(dim=0)
+        if query.sort_order == 'direction' or query.sort_order == 'direction_rev':
+            if all_query_embeddings.shape[0] != 2:
+                raise ValueError("direction sort order requires exactly 2 query embeddings (got " + str(all_query_embeddings.shape[0]) + ")")
+            direction = all_query_embeddings[1] - all_query_embeddings[0]
+            direction /= direction.norm()
+            if query.sort_order == 'direction_rev':
+                direction = -direction
+            final_similarities = torch.matmul(corpus_embeddings, direction.unsqueeze(-1)).squeeze(-1)
         else:
-            summed_similarities = weighted_similarities.sum(dim=0)
+            similarities = torch.matmul(all_query_embeddings, corpus_embeddings.T)
+            weighted_similarities = (similarities.T * weights).T
+            if query.sort_order == 'similarity_max' or query.sort_order == 'similarity_max_asc':
+                final_similarities = weighted_similarities.max(dim=0).values
+            else:
+                final_similarities = weighted_similarities.sum(dim=0)
+
         ascending_order = query.sort_order == 'similarity_asc' or query.sort_order == 'similarity_max_asc'
-        ordered_indices = torch.argsort(summed_similarities, dim=0, descending=not ascending_order)
+        ordered_indices = torch.argsort(final_similarities, dim=0, descending=not ascending_order)
 
         if progress_callback is not None:
             progress_callback(0.9, "Sorting")
@@ -337,12 +352,12 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         if progress_callback is not None:
             progress_callback(1, "Finished")
 
-        query_results = [QueryResult(similarity=summed_similarities[i].item(),
+        query_results = [QueryResult(similarity=final_similarities[i].item(),
                             path=corpus_paths[i],
                             id=corpus_image_ids[i])
                 for i in paginated_indices]
         if return_total_available:
-            return query_results, summed_similarities.shape[0]
+            return query_results, final_similarities.shape[0]
         else:
             return query_results
 

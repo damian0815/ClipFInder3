@@ -67,13 +67,13 @@ function App() {
                                     onResultCountsChange={setResultCounts}
                                   />
                               </TabPanel>
-                              <TabPanel>
+                              {/*<TabPanel>
                                   <ZeroShotClassificationQuery 
                                     setSelectedImages={setSelectedImages}
                                     thumbnailSize={thumbnailSize}
                                     onGridFocusChange={setGridHasFocus}
                                   />
-                              </TabPanel>
+                              </TabPanel>*/}
                           </Tabs>
                         </div>
                     </div>

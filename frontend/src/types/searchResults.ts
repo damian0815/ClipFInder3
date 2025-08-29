@@ -4,4 +4,4 @@ export type ResultCounts = {
     total: number;
 }
 
-export type SortOrder = 'similarity' | 'similarity_asc' | 'semantic_page' | 'similarity_max' | 'similarity_max_asc' | 'direction'
+export type SortOrder = 'similarity' | 'similarity_asc' | 'semantic_page' | 'similarity_max' | 'similarity_max_asc' | 'direction' | 'direction_rev'

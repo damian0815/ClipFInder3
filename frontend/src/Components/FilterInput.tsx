@@ -4,6 +4,7 @@ import {useEffect, useState} from "react";
 type FilterInputProps = {
     initialFilterInput: FilterInputData
     setFilterInput: (input: FilterInputData) => void
+    onEnterPressed?: () => void
 }
 
 export function FilterInput(props: FilterInputProps) {
@@ -30,6 +31,11 @@ export function FilterInput(props: FilterInputProps) {
                     placeholder="Path contains"
                     value={positivePathContains}
                     onChange={(e) => setPositivePathContains(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            props.onEnterPressed && props.onEnterPressed();
+                        }
+                    }}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>
@@ -40,6 +46,11 @@ export function FilterInput(props: FilterInputProps) {
                     placeholder="Not path contains"
                     value={negativePathContains}
                     onChange={(e) => setNegativePathContains(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            props.onEnterPressed && props.onEnterPressed();
+                        }
+                    }}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>
@@ -50,6 +61,11 @@ export function FilterInput(props: FilterInputProps) {
                     placeholder="Tags (positive, comma-separated)"
                     value={positiveTags}
                     onChange={(e) => setPositiveTags(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            props.onEnterPressed && props.onEnterPressed();
+                        }
+                    }}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>
@@ -60,6 +76,11 @@ export function FilterInput(props: FilterInputProps) {
                     placeholder="Tags (negative, comma-separated)"
                     value={negativeTags}
                     onChange={(e) => setNegativeTags(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            props.onEnterPressed && props.onEnterPressed();
+                        }
+                    }}
                     className="border rounded-lg p-1 w-full"
                 />
             </label>

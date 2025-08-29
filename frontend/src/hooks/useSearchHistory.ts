@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { EmbeddingInputData, FilterInputData } from '@/Datatypes/EmbeddingInputData';
+import { SortOrder } from '@/types/searchResults';
 
 export interface SearchHistoryEntry {
     id: string;
@@ -7,6 +8,7 @@ export interface SearchHistoryEntry {
     embeddingInputs: EmbeddingInputData[];
     filterInput: FilterInputData;
     sortOrder: SortOrder;
+    searchMethod?: 'distance' | 'direction'; // Search method
     name?: string; // Optional user-friendly name
 }
 
@@ -61,6 +63,7 @@ export function useSearchHistory() {
         embeddingInputs: EmbeddingInputData[],
         filterInput: FilterInputData,
         sortOrder: SortOrder,
+        searchMethod?: 'distance' | 'direction',
         name?: string
     ) => {
         // Don't save empty searches
@@ -82,6 +85,7 @@ export function useSearchHistory() {
             ),
             filterInput: Object.assign(new FilterInputData(), filterInput),
             sortOrder,
+            searchMethod,
             name
         };
 

@@ -206,11 +206,11 @@ class GetEmbeddingsRequest(BaseModel):
 async def get_embeddings(request: GetEmbeddingsRequest):
     all_embeddings = []
     if request.texts:
-        text_embeddings = embedding_store.get_text_embeddings(request.texts)
-        all_embeddings.append(text_embeddings)
+        text_embeddings = [embedding_store.get_text_embedding(t).unsqueeze(0) for t in request.texts]
+        all_embeddings.extend(text_embeddings)
     if request.image_ids:
         paths = [embedding_store.get_image_path_for_id(id) for id in request.image_ids]
-        image_embeddings = embedding_store.get_image_embeddings(paths)
+        _, image_embeddings = embedding_store.get_image_embeddings(paths)
         all_embeddings.append(image_embeddings)
     all_embeddings = torch.cat(all_embeddings, dim=0) if all_embeddings else torch.empty(0)
 
@@ -221,7 +221,7 @@ async def get_embeddings(request: GetEmbeddingsRequest):
     else: 
         raise HTTPException(status_code=400, detail=f"Unknown reduction method: {request.reduction}")
     
-    return all_embeddings.cpu().tolist()
+    return { 'embedding': all_embeddings.cpu().tolist() }
 
 @app.post("/api/zero-shot-classify")
 async def zero_shot_classify(request: ZeroShotClassifyRequest):

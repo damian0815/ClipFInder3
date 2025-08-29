@@ -64,14 +64,14 @@ export default function MainStatusBar(props: MainStatusBarProps) {
        </div>
    }
 
-    return <div className="status-bar flex items-center justify-between px-4 py-2 bg-slate-50 border-t border-slate-200">
+    return <div className="status-bar justify-between px-4 py-2 bg-slate-50 border-t border-slate-200">
         {/* Left side - selection info */}
-        <div className="flex-1">
+        <div className="w-5/8 overflow-hidden text-ellipsis mr-2">
             {props.selectedImages.length > 0 && wrangleCommonPaths(props.selectedImages)}
         </div>
         
         {/* Right side - controls and status */}
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center gap-6 text-sm ml-4 w-3/8">
             {/* Grid focus status */}
             <div className="text-xs text-slate-500">
                 {props.gridHasFocus ? (

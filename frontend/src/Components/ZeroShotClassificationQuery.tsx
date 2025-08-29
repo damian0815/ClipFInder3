@@ -14,7 +14,7 @@ type ZeroShotClassificationQueryProps = {
     setSelectedImages: (images: Image[]) => void;
     thumbnailSizeIndex?: number;
     onThumbnailSizeChange?: (index: number) => void;
-    onGridFocusChange?: (focused: boolean) => void;
+    onGridFocusChange: (focused: boolean) => void;
 }
 
 type ZeroShotClassification = {

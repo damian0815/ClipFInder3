@@ -6,6 +6,7 @@ import {EmbeddingInputData, FilterInputData} from "@/Datatypes/EmbeddingInputDat
 import {FilterInput} from "@/Components/FilterInput.tsx";
 import {v4 as uuidv4} from 'uuid';
 import {startSearchWithTaskId, SearchParams} from "@/api/search";
+import { getEmbeddings } from "@/api/search";
 import {useAsyncTaskManager} from "@/hooks/useAsyncTaskManager";
 import {getImageIdsForTagsAsync as startGetImageIdsForTagsAsync} from "@/api";
 import {useProgressWebSocketContext} from "@/contexts/ProgressWebSocketContext";
@@ -38,6 +39,11 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [searchError, setSearchError] = useState<string | null>(null);
     const [searchIsRunning, setSearchIsRunning] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+    // Direction search validation
+    const isDirectionSearch = sortOrder === 'direction' || sortOrder === 'direction_rev';
+    const validEmbeddingInputs = embeddingInputs?.filter(input => input.value) || [];
+    const isValidForDirectionSearch = isDirectionSearch ? validEmbeddingInputs.length === 2 : true;
 
     // Infinite scroll state
     const [resultCounts, setResultCounts] = useState<ResultCounts>({fetched: 0, total: 0});
@@ -289,19 +295,63 @@ function DistanceQuery(props: DistanceQueryProps) {
 
             const weights = [...textWeights, ...imageWeights];
 
-            // Build and store search params for pagination
-            const searchParams: SearchParams = {
-                texts: texts,
-                image_ids: imageIds,
-                weights: weights,
-                required_path_contains: filterInput.positivePathContains,
-                excluded_path_contains: filterInput.negativePathContains,
-                excluded_image_ids: excludedImageIds,
-                required_image_ids: requiredImageIds,
-                offset: 0,
-                limit: pageSize,
-                sort_order: sortOrder
-            };
+            // Build search params - handle direction search specially
+            let searchParams: SearchParams;
+            
+            if (sortOrder === 'direction' || sortOrder === 'direction_rev') {
+                // For direction search, we need exactly 2 embedding inputs
+                if (validEmbeddingInputs.length !== 2) {
+                    throw new Error('Direction search requires exactly 2 embedding inputs');
+                }
+                
+                // Get embeddings for both inputs
+                const embeddings: number[][] = [];
+                for (const input of validEmbeddingInputs) {
+                    let embedding: number[];
+                    if (input.mode === 'text' && input.text) {
+                        embedding = await getEmbeddings([input.text], undefined, 'mean_norm');
+                    } else if (input.mode === 'image' && input.imageId) {
+                        embedding = await getEmbeddings(undefined, [input.imageId], 'mean_norm');
+                    } else if (input.mode === 'tags' && input.tags && input.tags.length > 0) {
+                        // For tags, get image IDs and then embeddings
+                        const tagImageIds = await getImageIdsForTags(input.tags);
+                        if (tagImageIds.length > 0) {
+                            embedding = await getEmbeddings(undefined, tagImageIds, 'mean_norm');
+                        } else {
+                            throw new Error(`No images found for tags: ${input.tags.join(', ')}`);
+                        }
+                    } else {
+                        throw new Error('Invalid embedding input for direction search');
+                    }
+                    embeddings.push(embedding);
+                }
+                
+                searchParams = {
+                    embeddings: embeddings,
+                    weights: [1, 1], // Equal weights for direction search
+                    required_path_contains: filterInput.positivePathContains,
+                    excluded_path_contains: filterInput.negativePathContains,
+                    excluded_image_ids: excludedImageIds,
+                    required_image_ids: requiredImageIds,
+                    offset: 0,
+                    limit: pageSize,
+                    sort_order: sortOrder
+                };
+            } else {
+                // Regular search
+                searchParams = {
+                    texts: texts,
+                    image_ids: imageIds,
+                    weights: weights,
+                    required_path_contains: filterInput.positivePathContains,
+                    excluded_path_contains: filterInput.negativePathContains,
+                    excluded_image_ids: excludedImageIds,
+                    required_image_ids: requiredImageIds,
+                    offset: 0,
+                    limit: pageSize,
+                    sort_order: sortOrder
+                };
+            }
             setCurrentSearchParams(searchParams);
 
             // Perform initial search (page 0)
@@ -312,7 +362,9 @@ function DistanceQuery(props: DistanceQueryProps) {
 
             // Save search to history after successful completion
             if (embeddingInputs && filterInput) {
-                addToHistory(embeddingInputs, filterInput, sortOrder);
+                const isDirectionSearch = sortOrder === 'direction' || sortOrder === 'direction_rev';
+                const searchMethod = isDirectionSearch ? 'direction' : 'distance';
+                addToHistory(embeddingInputs, filterInput, sortOrder, searchMethod);
             }
 
         } catch (error) {
@@ -394,20 +446,23 @@ function DistanceQuery(props: DistanceQueryProps) {
             <Card>
                 <CardContent className="p-6">
                     <div className="flex flex-wrap gap-4 w-full mb-6">
-                        {embeddingInputs.map((input, index) => (
-                            <div key={input.id} className="w-80 flex-shrink-0">
-                                <EmbeddingInput 
-                                    id={input.id}
-                                    mode={input.mode}
-                                    value={input.value}
-                                    weight={input.weight}
-                                    imageId={input.imageId}
-                                    onValueChange={(newValue) => handleEmbeddingValueChange(index, newValue)}
-                                    onWeightChange={(newWeight) => handleEmbeddingWeightChange(index, newWeight)}
-                                    onDeleteClicked={(id) => handleDeleteEmbeddingInput(id)}
-                                    onQueryRequested={performPage0Search} />
-                            </div>
-                        ))}
+                        {embeddingInputs.map((input, index) => {
+                            const isInvalidForDirection = isDirectionSearch && index >= 2 && input.value;
+                            return (
+                                <div key={input.id} className={`w-80 flex-shrink-0 ${isInvalidForDirection ? 'ring-2 ring-red-500 rounded-lg' : ''}`}>
+                                    <EmbeddingInput 
+                                        id={input.id}
+                                        mode={input.mode}
+                                        value={input.value}
+                                        weight={input.weight}
+                                        imageId={input.imageId}
+                                        onValueChange={(newValue) => handleEmbeddingValueChange(index, newValue)}
+                                        onWeightChange={(newWeight) => handleEmbeddingWeightChange(index, newWeight)}
+                                        onDeleteClicked={(id) => handleDeleteEmbeddingInput(id)}
+                                        onQueryRequested={performPage0Search} />
+                                </div>
+                            );
+                        })}
                         <div className="flex flex-col gap-3 w-48 flex-shrink-0">
                             <Button 
                                 variant="outline"
@@ -425,10 +480,21 @@ function DistanceQuery(props: DistanceQueryProps) {
                             >
                                 + Add Tags Input
                             </Button>
+                            {isDirectionSearch && validEmbeddingInputs.length !== 2 && (
+                                <div className="text-sm text-red-600 mt-2">
+                                    {validEmbeddingInputs.length < 2 
+                                        ? `Direction search needs exactly 2 inputs (${validEmbeddingInputs.length}/2)`
+                                        : `Too many inputs for direction search (${validEmbeddingInputs.length}/2)`
+                                    }
+                                </div>
+                            )}
                         </div>
                     </div>
                     
-                    <FilterInput initialFilterInput={filterInput!} setFilterInput={(d) => setFilterInput(d)} />
+                    <FilterInput 
+                        initialFilterInput={filterInput!} 
+                        setFilterInput={(d) => setFilterInput(d)} 
+                        onEnterPressed={() => performPage0Search()} />
                 </CardContent>
             </Card>
             
@@ -449,7 +515,8 @@ function DistanceQuery(props: DistanceQueryProps) {
                         searchIsRunning || 
                         connectionStatus !== 'connected' ||
                         embeddingInputs!.length === 0 || 
-                        embeddingInputs!.filter(input => input.value).length === 0
+                        embeddingInputs!.filter(input => input.value).length === 0 ||
+                        !isValidForDirectionSearch
                     }
                 >
                     {connectionStatus !== 'connected' 
@@ -477,7 +544,8 @@ function DistanceQuery(props: DistanceQueryProps) {
                     <option value="similarity_asc">Least Similarity Sum</option>
                     <option value="similarity_max">Similarity Max</option>
                     <option value="similarity_max_asc">Similarity Min</option>
-                    <option value="direction">Direction</option>
+                    <option value="direction">Direction ←</option>
+                    <option value="direction_rev">Direction →</option>
                     <option value="semantic_page">Semantic (by page)</option>
                 </select>
             </div>
