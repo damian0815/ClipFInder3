@@ -13,14 +13,16 @@ import {useSearchHistory, SearchHistoryEntry} from "@/hooks/useSearchHistory";
 import {SearchHistoryDropdown} from "@/Components/SearchHistoryDropdown";
 import { Button } from "@/Components/ui/Button.tsx";
 import { Card, CardContent } from "@/Components/ui/Card.tsx";
+import {ResultCounts, SortOrder} from "@/types/searchResults.ts";
 
 
 type DistanceQueryProps = {
     setSelectedImages: (images: Image[]) => void;
-    thumbnailSizeIndex?: number;
-    onThumbnailSizeChange?: (index: number) => void;
-    onGridFocusChange?: (focused: boolean) => void;
-    onOffsetChange?: (offset: number) => void;
+    onRevealInFinder: (image: Image) => void;
+    thumbnailSize: number;
+    gridHasFocus: boolean;
+    onGridFocusChange: (focused: boolean) => void;
+    onResultCountsChange: (counts: ResultCounts) => void;
 }
 
 
@@ -29,7 +31,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [embeddingInputs, setEmbeddingInputs] = useState<EmbeddingInputData[] | undefined>(undefined)
     const [filterInput, setFilterInput] = useState<FilterInputData | undefined>(undefined)
     const pageSize = 200;
-    const [sortOrder, setSortOrder] = useState<'similarity' | 'semantic_page'>('similarity')
+    const [sortOrder, setSortOrder] = useState<SortOrder>('similarity')
 
     // Search state variables
     const [resultImages, setResultImages] = useState<Image[]>([]);
@@ -38,7 +40,7 @@ function DistanceQuery(props: DistanceQueryProps) {
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
     // Infinite scroll state
-    const [currentOffset, setCurrentOffset] = useState(0);
+    const [resultCounts, setResultCounts] = useState<ResultCounts>({fetched: 0, total: 0});
     const [hasMoreResults, setHasMoreResults] = useState(true);
 
     // Store filter state to preserve for pagination
@@ -93,8 +95,8 @@ function DistanceQuery(props: DistanceQueryProps) {
 
     // Notify parent of offset changes
     useEffect(() => {
-        props.onOffsetChange?.(currentOffset);
-    }, [currentOffset, props.onOffsetChange]);
+        props.onResultCountsChange(resultCounts);
+    }, [resultCounts, props.onResultCountsChange]);
 
     const restoreFromHistory = useCallback((entry: SearchHistoryEntry) => {
         console.log('Restoring search from history:', entry);
@@ -102,7 +104,7 @@ function DistanceQuery(props: DistanceQueryProps) {
         // Clear current results
         setResultImages([]);
         setSearchError(null);
-        setCurrentOffset(0);
+        setResultCounts({fetched: 0, total: 0});
         setHasMoreResults(true);
         setCurrentSearchParams(null);
         
@@ -147,40 +149,53 @@ function DistanceQuery(props: DistanceQueryProps) {
         }
     };
 
+    type SearchResultsPage = {
+        images: Image[];
+        offset: number;
+        totalAvailable: number
+    }
+
     // Function to perform search for a specific page
     const performSearchPage = async (
         offset: number, 
         searchParams: SearchParams,
-        append: boolean = false): Promise<Image[]> => {
+        append: boolean = false): Promise<SearchResultsPage> => {
 
         try {
             setSearchIsRunning(true)
 
-            const searchResult = await taskManager.runTask(async (taskId, taskData) => {
-                console.log(`Starting search with offset ${offset}, taskId:`, taskId);
+            const taskResult = await taskManager.runTask(
+                async (taskId, taskData) => {
+                    console.log(`Starting search with offset ${offset}, taskId:`, taskId);
 
-                // Start the search with the task ID
-                await startSearchWithTaskId(searchParams, taskId);
+                    // Start the search with the task ID
+                    await startSearchWithTaskId(searchParams, taskId);
 
-                // Wait for the search to complete and get results from taskData
-                while (!taskData.data) {
-                    // Check if search was cancelled using ref instead of state
-                    if (searchCancelledRef.current) {
-                        throw new Error("Search cancelled");
+                    // Wait for the search to complete and get results from taskData
+                    while (!taskData.data) {
+                        // Check if search was cancelled using ref instead of state
+                        if (searchCancelledRef.current) {
+                            throw new Error("Search cancelled");
+                        }
+                        console.log(`Waiting for search with offset ${offset} task id ${taskId} to complete...`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     }
-                    console.log(`Waiting for search with offset ${offset} task id ${taskId} to complete...`);
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                }
 
-                console.log('search completed, got results:', taskData);
-                return taskData.data;
-            });
+                    console.log('search completed, got results:', taskData);
+                    const data = taskData.data as any;
+                    return {
+                        images: data.images as Image[],
+                        offset: data.offset,
+                        totalAvailable: data.total_available
+                    }
+                });
 
-            if (searchResult.error) {
-                throw new Error(searchResult.error);
+            if (taskResult.error) {
+                throw new Error(taskResult.error);
             }
 
-            const newImages = searchResult.data as Image[];
+            const searchResult = taskResult.data as SearchResultsPage;
+            const newImages = searchResult.images as Image[];
             if (!newImages) {
                 console.error("newImages is undefined. searchResult:", searchResult);
             }
@@ -193,7 +208,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                 setHasMoreResults(gotFullPage);
             }
 
-            return newImages;
+            return { images: newImages, offset: searchResult.offset, totalAvailable: searchResult.totalAvailable };
         } finally {
             setSearchIsRunning(false);
         }
@@ -232,7 +247,7 @@ function DistanceQuery(props: DistanceQueryProps) {
         console.log('starting search', embeddingInputs, filterInput)
 
         // Reset pagination state for new search
-        setCurrentOffset(0);
+        setResultCounts({fetched: 0, total: 0});
         setHasMoreResults(true);
         searchCancelledRef.current = false;
         setSearchIsRunning(true);
@@ -290,8 +305,9 @@ function DistanceQuery(props: DistanceQueryProps) {
             setCurrentSearchParams(searchParams);
 
             // Perform initial search (page 0)
-            const initialResults = await performSearchPage(0, searchParams, false);
-            setResultImages(initialResults);
+            const initialPage = await performSearchPage(0, searchParams, false);
+            setResultImages(initialPage.images);
+            setResultCounts({fetched: initialPage.images.length, total: initialPage.totalAvailable});
             setSearchIsRunning(false);
 
             // Save search to history after successful completion
@@ -320,17 +336,20 @@ function DistanceQuery(props: DistanceQueryProps) {
         try {
             const nextOffset = (currentSearchParams.offset ?? 0) + pageSize;
             currentSearchParams.offset = nextOffset;
-            const moreResults = await performSearchPage(nextOffset, currentSearchParams, true);
-            const moreResultsFiltered = [...moreResults].filter(image => !resultImages.some(existing => existing.id === image.id));
+            const nextPage = await performSearchPage(nextOffset, currentSearchParams, true);
+            const moreResultsFiltered = [...nextPage.images].filter(image => !resultImages.some(existing => existing.id === image.id));
 
             setResultImages(prev => [...prev, ...moreResultsFiltered]);
-            setCurrentOffset(nextOffset);
+            setResultCounts({
+                fetched: resultImages.length + moreResultsFiltered.length,
+                total: nextPage.totalAvailable
+            });
 
         } catch (error) {
             console.error('Error loading more results:', error);
             setSearchError(error instanceof Error ? error.message : 'Failed to load more results');
         }
-    }, [currentOffset, hasMoreResults, searchIsRunning, currentSearchParams, connectionStatus, resultImages]);
+    }, [resultCounts, hasMoreResults, searchIsRunning, currentSearchParams, connectionStatus, resultImages]);
 
     useEffect(() => {
         // Attach scroll event listener for infinite scroll
@@ -360,10 +379,10 @@ function DistanceQuery(props: DistanceQueryProps) {
         setEmbeddingInputs([...embeddingInputs, new EmbeddingInputData({id: `distanceQuery-${uuidv4()}`, imageId: image.id})]);
     }
 
-    const handleImageDeleted = (imageId: string) => {
+    /*const handleImageDeleted = (imageId: string) => {
         console.log("Removing deleted image from results:", imageId);
         setResultImages(prev => prev.filter(img => img.id !== imageId));
-    };
+    };*/
 
     // Don't render until initialized
     if (!embeddingInputs || !filterInput) {
@@ -448,13 +467,17 @@ function DistanceQuery(props: DistanceQueryProps) {
                 >
                     Cancel search
                 </Button>
-                
+
                 <select
-                    className={"border rounded px-2 py-1 w-1/4"}
+                    className={"border rounded px-2 py-1 w-1/5"}
                     value={sortOrder}
-                    onChange={e => setSortOrder(e.target.value as 'similarity' | 'semantic_page')}
+                    onChange={e => setSortOrder(e.target.value as SortOrder)}
                 >
-                    <option value="similarity">Similarity</option>
+                    <option value="similarity">Similarity Sum</option>
+                    <option value="similarity_asc">Least Similarity Sum</option>
+                    <option value="similarity_max">Similarity Max</option>
+                    <option value="similarity_max_asc">Similarity Min</option>
+                    <option value="direction">Direction</option>
                     <option value="semantic_page">Semantic (by page)</option>
                 </select>
             </div>
@@ -469,9 +492,9 @@ function DistanceQuery(props: DistanceQueryProps) {
                 images={resultImages}
                 onSelect={props.setSelectedImages}
                 onAddToQuery={handleAddToQuery}
-                onImageDeleted={handleImageDeleted}
-                thumbnailSizeIndex={props.thumbnailSizeIndex}
-                onThumbnailSizeChange={props.onThumbnailSizeChange}
+                onRevealInFinder={props.onRevealInFinder}
+                thumbnailSize={props.thumbnailSize}
+                gridHasFocus={props.gridHasFocus}
                 onGridFocusChange={props.onGridFocusChange}
             />
             

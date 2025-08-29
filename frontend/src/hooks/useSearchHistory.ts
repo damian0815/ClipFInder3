@@ -6,7 +6,7 @@ export interface SearchHistoryEntry {
     timestamp: number;
     embeddingInputs: EmbeddingInputData[];
     filterInput: FilterInputData;
-    sortOrder: 'similarity' | 'semantic_page';
+    sortOrder: SortOrder;
     name?: string; // Optional user-friendly name
 }
 
@@ -60,7 +60,7 @@ export function useSearchHistory() {
     const addToHistory = useCallback((
         embeddingInputs: EmbeddingInputData[],
         filterInput: FilterInputData,
-        sortOrder: 'similarity' | 'semantic_page',
+        sortOrder: SortOrder,
         name?: string
     ) => {
         // Don't save empty searches

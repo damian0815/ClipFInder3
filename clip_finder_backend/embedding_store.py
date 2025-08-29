@@ -32,7 +32,9 @@ class Query(BaseModel):
     # Pagination parameters
     offset: int = 0
     limit: int = 100
-    sort_order: Literal['similarity', 'semantic_page'] = 'similarity'
+    sort_order: Literal['similarity', 'similarity_asc', 
+                        'similarity_max', 'similarity_max_asc', 
+                        'direction', 'semantic_page'] = 'similarity'
 
     @staticmethod
     def text_query(text: str):
@@ -66,7 +68,8 @@ class EmbeddingStore(Protocol):
     def get_text_embedding(self, text: str) -> torch.Tensor:
         ...
 
-    def search_images(self, query: Query, progress_callback: Optional[Callable[[float, str], None]]=None) -> List[QueryResult]:
+    def search_images(self, query: Query, progress_callback: Optional[Callable[[float, str], None]]=None,
+                      return_total_available: bool=False) -> tuple[list[QueryResult], int]|list[QueryResult]:
         ...
 
     def has_image(self, path: str) -> bool:
@@ -218,7 +221,12 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             text_embedding = self.add_text(text)
             return text_embedding
 
-    def search_images(self, query: Query, progress_callback: Callable[[float, str], None] = None) -> List[QueryResult]:
+    def search_images(
+            self,
+            query: Query,
+            progress_callback: Callable[[float, str], None] = None,
+            return_total_available: bool = False
+    ) -> tuple[list[QueryResult], int] | list[QueryResult]:
         weights = list(query.weights)
         inputs_counts = [len(query.embeddings) if query.embeddings else 0,
                                 len(query.texts) if query.texts else 0,
@@ -304,13 +312,12 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
 
         similarities = torch.matmul(all_query_embeddings, corpus_embeddings.T)
         weighted_similarities = (similarities.T * weights).T
-        if query.reduce_method == 'sum':
-            summed_similarities = weighted_similarities.sum(dim=0)
-        elif query.reduce_method == 'max':
+        if query.sort_order == 'similarity_max' or query.sort_order == 'similarity_max_asc':
             summed_similarities, _ = weighted_similarities.max(dim=0)
         else:
-            raise ValueError(f"unknown reduction method {query.reduce_method}")
-        ordered_indices = torch.argsort(summed_similarities, dim=0, descending=True)
+            summed_similarities = weighted_similarities.sum(dim=0)
+        ascending_order = query.sort_order == 'similarity_asc' or query.sort_order == 'similarity_max_asc'
+        ordered_indices = torch.argsort(summed_similarities, dim=0, descending=not ascending_order)
 
         if progress_callback is not None:
             progress_callback(0.9, "Sorting")
@@ -330,10 +337,15 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         if progress_callback is not None:
             progress_callback(1, "Finished")
 
-        return [QueryResult(similarity=summed_similarities[i].item(),
+        query_results = [QueryResult(similarity=summed_similarities[i].item(),
                             path=corpus_paths[i],
                             id=corpus_image_ids[i])
                 for i in paginated_indices]
+        if return_total_available:
+            return query_results, summed_similarities.shape[0]
+        else:
+            return query_results
+
 
     def add_images_precomputed(self, paths: list[str], embeddings: torch.Tensor, save=False):
         new_indices = [i for i, p in enumerate(paths) if not self.has_image(p)]

@@ -15,7 +15,7 @@ async def perform_search_task(task_id: str, query: Query, progress_manager: Prog
         # Perform the actual search
         def on_search_progress(progress: float, message: str=None):
             progress_manager.update_task_progress(task_id, progress*100, message=message),
-        results = embedding_store.search_images(query=query, progress_callback=on_search_progress)
+        results, total = embedding_store.search_images(query=query, progress_callback=on_search_progress, return_total_available=True)
 
         # Validate results as before
         for r in results:
@@ -26,7 +26,11 @@ async def perform_search_task(task_id: str, query: Query, progress_manager: Prog
         search_results = [ImageResponse(id=r.id, path=r.path, distance=1-r.similarity)
                          for r in results]
 
-        progress_manager.complete_task(task_id, "Search completed", data=search_results)
+        progress_manager.complete_task(task_id, "Search completed", data={
+            'images': search_results,
+            'offset': query.offset,
+            'total_available': total
+        })
 
     except Exception as e:
         traceback.print_exc()

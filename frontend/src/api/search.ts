@@ -11,7 +11,7 @@ export interface SearchParams {
     // Pagination parameters
     offset?: number;
     limit?: number;
-    sort_order?: 'similarity' | 'semantic_page'
+    sort_order?: SortOrder;
 }
 
 export interface SearchResult {

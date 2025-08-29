@@ -1,7 +1,7 @@
-import './App.css';
+import '@/App.css';
 import {Tab, TabList, TabPanel, Tabs} from 'react-tabs';
-import './Style/Tabs.css';
-import './Style/Collapsible.css'
+import '@/Style/Tabs.css';
+import '@/Style/Collapsible.css'
 
 import PopulateDatabase from "@/Components/PopulateDatabase.tsx";
 import { Collapsible } from "@/Components/ui/Collapsible.tsx";
@@ -13,18 +13,26 @@ import {TagEditorSidebar} from "@/Components/TagEditorSidebar.tsx";
 import ProgressStatusBar from "@/Components/ProgressStatusBar.tsx";
 import { ProgressWebSocketProvider } from "@/contexts/ProgressWebSocketContext";
 import MainStatusBar from '@/Components/MainStatusBar';
+import { API_BASE_URL } from '@/Constants';
+import { ResultCounts } from '@/types/searchResults';
 
 function App() {
 
     const [selectedImages, setSelectedImages] = useState<Image[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(2);
+    const [thumbnailSize, setThumbnailSize] = useState<number>(32);
     const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
-    const [currentOffset, setCurrentOffset] = useState<number | undefined>(undefined);
+    const [resultCounts, setResultCounts] = useState<ResultCounts>({fetched: 0, total: 0});
 
     const toggleSidebar = () => {
         setSidebarOpen(!sidebarOpen);
     };
+
+    const handleRevealInFinder = (img: Image) => {
+        console.log("reveal in finder for image", img);
+        fetch(`${API_BASE_URL}/api/revealInFinder/${img.id}`);
+    };
+
 
     return (
         <ProgressWebSocketProvider>
@@ -52,17 +60,17 @@ function App() {
                               <TabPanel>
                                   <DistanceQuery 
                                     setSelectedImages={setSelectedImages}
-                                    thumbnailSizeIndex={thumbnailSizeIndex}
-                                    onThumbnailSizeChange={setThumbnailSizeIndex}
+                                    onRevealInFinder={handleRevealInFinder}
+                                    thumbnailSize={thumbnailSize}
+                                    gridHasFocus={gridHasFocus}
                                     onGridFocusChange={setGridHasFocus}
-                                    onOffsetChange={setCurrentOffset}
+                                    onResultCountsChange={setResultCounts}
                                   />
                               </TabPanel>
                               <TabPanel>
                                   <ZeroShotClassificationQuery 
                                     setSelectedImages={setSelectedImages}
-                                    thumbnailSizeIndex={thumbnailSizeIndex}
-                                    onThumbnailSizeChange={setThumbnailSizeIndex}
+                                    thumbnailSize={thumbnailSize}
                                     onGridFocusChange={setGridHasFocus}
                                   />
                               </TabPanel>
@@ -83,10 +91,10 @@ function App() {
 
               <MainStatusBar 
                 selectedImages={selectedImages} 
-                thumbnailSizeIndex={thumbnailSizeIndex}
-                onThumbnailSizeChange={setThumbnailSizeIndex}
+                thumbnailSize={thumbnailSize}
+                setThumbnailSize={setThumbnailSize}
                 gridHasFocus={gridHasFocus}
-                currentOffset={currentOffset}
+                resultCounts={resultCounts}
               />
             </div>
         </ProgressWebSocketProvider>

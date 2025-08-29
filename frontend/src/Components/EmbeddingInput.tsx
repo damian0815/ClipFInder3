@@ -35,8 +35,10 @@ function EmbeddingInput(props: EmbeddingInputProps) {
     }, [props.weight]);
 
     return <div className={'w-full'}>
-        <div className={"text-center"}>
-            <div className={"inline-block h-6 mr-1"}>Weight:</div>
+        <div className={"text-left"}>
+            <button className={"inline-block"} 
+                onClick={(_) => props.onDeleteClicked(props.id)}>❌</button>
+            <div className={"inline-block h-6 m-1"}>{props.mode}, weight =</div>
             <input 
                 type="text"
                 inputMode="numeric"
@@ -51,10 +53,6 @@ function EmbeddingInput(props: EmbeddingInputProps) {
                     }
                 }}
             />
-            {props.weight}
-            <div className={"inline-block ml-10 mr-2"}>{props.mode}</div>
-            <button className={"inline-block"} 
-                onClick={(_) => props.onDeleteClicked(props.id)}>❌</button>
         </div>
         {(props.mode === 'tags' || props.mode === 'text') && (
             <div className={"border rounded-lg p-1 w-full"}>

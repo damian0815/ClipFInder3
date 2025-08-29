@@ -1,29 +1,36 @@
 import Image from "@/types/image";
+import { ResultCounts } from "@/types/searchResults";
+import {useEffect, useState} from "react";
 
 interface MainStatusBarProps {
   selectedImages: Image[];
-  thumbnailSizeIndex?: number;
-  onThumbnailSizeChange?: (index: number) => void;
+  thumbnailSize: number,
+  setThumbnailSize: (size: number) => void;
   gridHasFocus?: boolean;
-  currentOffset?: number;
+  resultCounts: ResultCounts;
 }
 
 export default function MainStatusBar(props: MainStatusBarProps) {
 
   // Define Tailwind size options
   const sizeOptions = [
-    { name: 'XS', class: 'w-16 h-16', minWidth: '4rem' },
-    { name: 'SM', class: 'w-20 h-20', minWidth: '5rem' },
-    { name: 'MD', class: 'w-32 h-32', minWidth: '8rem' },
-    { name: 'LG', class: 'w-48 h-48', minWidth: '12rem' },
-    { name: 'XL', class: 'w-64 h-64', minWidth: '16rem' },
-    { name: '2XL', class: 'w-88 h-88', minWidth: '22rem' },
-    { name: '3XL', class: 'w-112 h-112', minWidth: '28rem' },
-    { name: '4XL', class: 'w-136 h-136', minWidth: '34rem' }
+    { name: 'XS', size: 16, class: 'w-16 h-16', minWidth: '4rem' },
+    { name: 'SM', size: 20, class: 'w-20 h-20', minWidth: '5rem' },
+    { name: 'MD', size: 32, class: 'w-32 h-32', minWidth: '8rem' },
+    { name: 'LG', size: 48, class: 'w-48 h-48', minWidth: '12rem' },
+    { name: 'XL', size: 64, class: 'w-64 h-64', minWidth: '16rem' },
+    { name: '2XL', size: 88, class: 'w-88 h-88', minWidth: '22rem' },
+    { name: '3XL', size: 112, class: 'w-112 h-112', minWidth: '28rem' },
+    { name: '4XL', size: 136, class: 'w-136 h-136', minWidth: '34rem' }
   ];
 
-  const currentSize = sizeOptions[props.thumbnailSizeIndex ?? 2];
+  const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(sizeOptions.findIndex(s => s.size === (props.thumbnailSize)) ?? 2);
 
+  useEffect(() => {
+    props.setThumbnailSize(sizeOptions[thumbnailSizeIndex].size);
+  }, [thumbnailSizeIndex]);
+
+  const currentSize = sizeOptions[thumbnailSizeIndex];
 
     function longestCommonPrefix(strs: string[]) {
      if (strs.length === 0) {
@@ -77,27 +84,23 @@ export default function MainStatusBar(props: MainStatusBarProps) {
             </div>
             
             {/* Current offset */}
-            {props.currentOffset !== undefined && (
-                <div className="text-xs text-slate-600">
-                    Current offset: {props.currentOffset}
-                </div>
-            )}
-            
+            <div className="text-xs text-slate-600">
+                Loaded {props.resultCounts.fetched}/{props.resultCounts.total}
+            </div>
+
             {/* Thumbnail size control */}
-            {props.onThumbnailSizeChange && (
-                <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-slate-700">Size:</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max={sizeOptions.length - 1}
-                        value={props.thumbnailSizeIndex ?? 2}
-                        onChange={(e) => props.onThumbnailSizeChange?.(Number(e.target.value))}
-                        className="w-24"
-                    />
-                    <span className="text-xs text-slate-600 min-w-[2rem]">{currentSize.name}</span>
-                </div>
-            )}
+            <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-700">Size:</label>
+                <input
+                    type="range"
+                    min="0"
+                    max={sizeOptions.length - 1}
+                    value={thumbnailSizeIndex ?? 2}
+                    onChange={(e) => setThumbnailSizeIndex(Number(e.target.value))}
+                    className="w-24"
+                />
+                <span className="text-xs text-slate-600 min-w-[2rem]">{currentSize.name}</span>
+            </div>
         </div>
     </div>
 }

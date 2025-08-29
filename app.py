@@ -5,12 +5,13 @@ import traceback
 import threading
 import uuid
 import os
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
 from pydantic import BaseModel
+import torch
 
 from clip_finder_backend.clip_modelling import AutoloadingClipModel
 from clip_finder_backend.progress_manager import ProgressManager
@@ -20,6 +21,8 @@ from clip_finder_backend.thumbnail_provider import ThumbnailProvider
 from clip_finder_backend.types import ZeroShotClassifyRequest, ImageResponse
 from clip_finder_backend.zero_shot import do_zero_shot_classify
 from clip_finder_backend.tags_wrangler import TagsWrangler
+
+import torch.nn.functional as F
 
 logging.basicConfig(level=logging.DEBUG,
                     format="%(asctime)s | %(levelname)-8s | "
@@ -181,17 +184,6 @@ class ImagesByTagsInput(BaseModel):
 @app.post("/api/images/by-tags")
 async def get_images_by_tags(input: ImagesByTagsInput, background_tasks: BackgroundTasks):
     task_id = input.task_id or str(f'tags-by-images-{uuid.uuid4()}')
-    #asyncio.create_task(
-    #    perform_get_images_by_tags_task(
-    #        task_id=task_id, tags=input.tags,
-    #        progress_manager=progress_manager, embedding_store=embedding_store,
-    #        tags_wrangler=tags_wrangler)
-    #)
-    #background_tasks.add_task(
-    #    perform_get_images_by_tags_task, task_id=task_id, tags=input.tags,
-    #    progress_manager=progress_manager, embedding_store=embedding_store, tags_wrangler=tags_wrangler
-    #
-    # Define a callback that can be safely called from another thread
     def perform_get_images_by_tags_task_from_thread():
         asyncio.run(
             perform_get_images_by_tags_task(task_id=task_id, tags=input.tags,
@@ -204,6 +196,32 @@ async def get_images_by_tags(input: ImagesByTagsInput, background_tasks: Backgro
         task_id=task_id,
         message="Images by tags fetch started. Use WebSocket to receive progress updates."
     )
+
+class GetEmbeddingsRequest(BaseModel):
+    texts: list[str]|None = None
+    image_ids: list[str] = None
+    reduction: Literal['mean_norm', 'none'] = 'mean_norm'
+
+@app.post("/api/embeddings")
+async def get_embeddings(request: GetEmbeddingsRequest):
+    all_embeddings = []
+    if request.texts:
+        text_embeddings = embedding_store.get_text_embeddings(request.texts)
+        all_embeddings.append(text_embeddings)
+    if request.image_ids:
+        paths = [embedding_store.get_image_path_for_id(id) for id in request.image_ids]
+        image_embeddings = embedding_store.get_image_embeddings(paths)
+        all_embeddings.append(image_embeddings)
+    all_embeddings = torch.cat(all_embeddings, dim=0) if all_embeddings else torch.empty(0)
+
+    if request.reduction == 'mean_norm':
+        all_embeddings = all_embeddings.mean(dim=0, keepdim=False) # shape: [emb_dim]
+    elif request.reduction == 'none':
+        pass
+    else: 
+        raise HTTPException(status_code=400, detail=f"Unknown reduction method: {request.reduction}")
+    
+    return all_embeddings.cpu().tolist()
 
 @app.post("/api/zero-shot-classify")
 async def zero_shot_classify(request: ZeroShotClassifyRequest):
