@@ -14,7 +14,7 @@ export type ResultImageProps = {
 };
 
 export function ResultImage(props: ResultImageProps) {
-  const { setNodeRef, isSelected, isAdding, isRemoving } = useSelectable({
+  const { setNodeRef, isAdding, isRemoving } = useSelectable({
       value: props.image,
   });
 
@@ -34,12 +34,17 @@ export function ResultImage(props: ResultImageProps) {
     mergeTagsTo(props.image);
   };
 
+  // Use the isSelected prop passed from parent instead of useSelectable's isSelected
+  const isSelected = props.isSelected;
+
   return <div
       ref={setNodeRef}
       className={"p-2"}
       style={{
-            border: isAdding ? '1px solid blue' : (isRemoving ? '1px solid red' : '1px solid transparent'), // Highlight selected images
-            background: isSelected ? '#1677ff40' : 'transparent'
+            border: isAdding ? '2px solid blue' : (isRemoving ? '2px solid red' : '2px solid transparent'), 
+            background: isSelected ? '#3b82f6' : 'transparent', // More prominent blue background
+            borderRadius: '8px',
+            transition: 'all 0.15s ease-in-out'
       }}
     >
       <ContextMenu.Root>

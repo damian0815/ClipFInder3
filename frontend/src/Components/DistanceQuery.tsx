@@ -425,7 +425,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                     }
                 >
                     {connectionStatus !== 'connected' 
-                        ? `Search (WebSocket ${connectionStatus})`
+                        ? `Search (backend ${connectionStatus})`
                         : searchIsRunning 
                         ? 'Searching...' 
                         : `Search (${embeddingInputs!.filter(input => input.value).length} non-empty inputs)`

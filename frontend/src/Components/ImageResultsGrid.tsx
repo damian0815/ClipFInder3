@@ -9,6 +9,10 @@ interface ImageResultsGridProps {
   onSelect: (selectedImages: Image[]) => void;
   onAddToQuery: (image: Image) => void;
   onImageDeleted?: (imageId: string) => void;
+  thumbnailSizeIndex?: number;
+  onThumbnailSizeChange?: (index: number) => void;
+  gridHasFocus?: boolean;
+  onGridFocusChange?: (focused: boolean) => void;
 }
 
 function ImageResultsGrid({ 
@@ -22,6 +26,7 @@ function ImageResultsGrid({
   const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
   const [quickLookVisible, setQuickLookVisible] = useState<boolean>(false);
   const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(2);
+  const [selectionAnchor, setSelectionAnchor] = useState<number>(-1); // For range selection
   const gridRef = useRef<HTMLDivElement>(null);
   const [gridColumns, setGridColumns] = useState<number>(1);
 
@@ -94,6 +99,10 @@ function ImageResultsGrid({
         if (quickLookVisible) {
           setQuickLookVisible(false);
         } else {
+          // Clear selection when Escape is pressed and QuickLook isn't open
+          setSelectedImages([]);
+          onSelect([]);
+          setSelectionAnchor(-1);
           setGridHasFocus(false);
           setFocusedImageIndex(-1);
         }
@@ -105,15 +114,23 @@ function ImageResultsGrid({
           const focusedImage = images[focusedImageIndex];
           if (e.shiftKey || e.metaKey) {
             // Add to selection
-            if (!selectedImages.includes(focusedImage)) {
+            const isAlreadySelected = selectedImages.includes(focusedImage);
+            if (isAlreadySelected) {
+              // Remove from selection
+              const newSelection = selectedImages.filter(img => img !== focusedImage);
+              setSelectedImages(newSelection);
+              onSelect(newSelection);
+            } else {
+              // Add to selection
               const newSelection = [...selectedImages, focusedImage];
               setSelectedImages(newSelection);
               onSelect(newSelection);
             }
           } else {
-            // Replace selection
+            // Replace selection and set anchor
             setSelectedImages([focusedImage]);
             onSelect([focusedImage]);
+            setSelectionAnchor(focusedImageIndex);
           }
         }
         break;
@@ -122,14 +139,35 @@ function ImageResultsGrid({
     if (newIndex !== focusedImageIndex && newIndex >= 0 && newIndex < images.length) {
       setFocusedImageIndex(newIndex);
       scrollToImage(newIndex);
+      
+      if (e.shiftKey && selectionAnchor >= 0) {
+        // Extend selection from anchor to new position
+        const startIndex = Math.min(selectionAnchor, newIndex);
+        const endIndex = Math.max(selectionAnchor, newIndex);
+        const rangeSelection = images.slice(startIndex, endIndex + 1);
+        
+        setSelectedImages(rangeSelection);
+        onSelect(rangeSelection);
+      } else if (!e.shiftKey) {
+        // Normal navigation without shift - set new anchor but don't change selection unless nothing is selected
+        setSelectionAnchor(newIndex);
+        
+        // Only auto-select if no current selection
+        if (selectedImages.length === 0) {
+          const focusedImage = images[newIndex];
+          setSelectedImages([focusedImage]);
+          onSelect([focusedImage]);
+        }
+      }
+      // If shift is held but no anchor, don't change selection
     }
-  }, [gridHasFocus, focusedImageIndex, images, quickLookVisible, gridColumns, selectedImages, onSelect]);
+  }, [gridHasFocus, focusedImageIndex, images, quickLookVisible, gridColumns, selectedImages, onSelect, selectionAnchor]);
 
   const scrollToImage = (index: number) => {
     const imageElement = gridRef.current?.children[1]?.children[index] as HTMLElement; // Skip the controls div
     if (imageElement) {
       imageElement.scrollIntoView({
-        behavior: 'smooth',
+        behavior: 'auto', // Changed from 'smooth' to 'auto' for immediate response
         block: 'nearest',
         inline: 'nearest'
       });
@@ -167,8 +205,10 @@ function ImageResultsGrid({
       setSelectedImages(newSelection);
       onSelect(newSelection);
     } else {
+      // Regular click - replace selection and set anchor
       setSelectedImages([image]);
       onSelect([image]);
+      setSelectionAnchor(index);
     }
   };
 
@@ -177,35 +217,10 @@ function ImageResultsGrid({
   return (
     <TagMergeProvider>
       <div className="space-y-4">
-        {/* Thumbnail Size Control */}
-        <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
-          <label className="text-sm font-medium text-slate-700">Thumbnail Size:</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="range"
-              min="0"
-              max={sizeOptions.length - 1}
-              value={thumbnailSizeIndex}
-              onChange={(e) => setThumbnailSizeIndex(Number(e.target.value))}
-              className="w-32"
-            />
-            <span className="text-sm text-slate-600 min-w-[3rem]">{currentSize.name}</span>
-          </div>
-          <div className="text-xs text-slate-500">
-            {gridHasFocus ? (
-              <span className="text-blue-600">
-                Grid focused • Use arrow keys to navigate • Space for QuickLook
-              </span>
-            ) : (
-              'Click on the grid to enable keyboard navigation'
-            )}
-          </div>
-        </div>
-
         {/* Image Grid */}
         <div
           ref={gridRef}
-          className={`grid gap-4 p-4 min-h-[200px] outline-none rounded-lg border-2 transition-colors ${
+          className={`grid gap-4 p-4 min-h-[200px] outline-none rounded-lg border-2 ${
             gridHasFocus 
               ? 'border-blue-500 bg-blue-50/30' 
               : 'border-slate-200 hover:border-slate-300'
@@ -227,25 +242,42 @@ function ImageResultsGrid({
             }
           }}
         >
-          {images.map((image, index) => (
-            <div
-              key={image.id}
-              className={`relative transition-all duration-150 ${
-                index === focusedImageIndex 
-                  ? 'ring-2 ring-blue-500 ring-offset-2 scale-105' 
-                  : ''
-              }`}
-            >
-              <ResultImage
-                image={image}
-                isSelected={selectedImages.includes(image)}
-                onClick={(e, img) => handleImageClick(e, img)}
-                onAddToQuery={onAddToQuery}
-                onRevealInFinder={() => {}} // TODO: implement if needed
-                className={currentSize.class}
-              />
-            </div>
-          ))}
+          {images.map((image, index) => {
+            const isFocused = index === focusedImageIndex;
+            const isSelected = selectedImages.includes(image);
+            
+            return (
+              <div
+                key={image.id}
+                className={`relative ${
+                  isFocused 
+                    ? 'ring-2 ring-yellow-400 ring-offset-2 scale-105' 
+                    : ''
+                } ${
+                  isSelected
+                    ? 'ring-2 ring-blue-500 ring-offset-1'
+                    : ''
+                }`}
+              >
+                <ResultImage
+                  image={image}
+                  isSelected={isSelected}
+                  onClick={(e, img) => handleImageClick(e, img)}
+                  onAddToQuery={onAddToQuery}
+                  onRevealInFinder={() => {}} // TODO: implement if needed
+                  className={currentSize.class}
+                />
+                {/* Selection indicator */}
+                {isSelected && (
+                  <div className="absolute top-1 right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         
         {/* Status */}
