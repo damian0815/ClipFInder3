@@ -8,10 +8,18 @@ type FilterInputProps = {
 }
 
 export function FilterInput(props: FilterInputProps) {
-    const [negativePathContains, setNegativePathContains] = useState<string|undefined>(props.initialFilterInput.positivePathContains)
+    const [negativePathContains, setNegativePathContains] = useState<string|undefined>(props.initialFilterInput.negativePathContains)
     const [positivePathContains, setPositivePathContains] = useState<string|undefined>(props.initialFilterInput.positivePathContains)
     const [negativeTags, setNegativeTags] = useState<string|undefined>(props.initialFilterInput.negativeTags)
     const [positiveTags, setPositiveTags] = useState<string|undefined>(props.initialFilterInput.positiveTags)
+
+    // Update internal state when initialFilterInput prop changes (e.g., from history restore)
+    useEffect(() => {
+        setNegativePathContains(props.initialFilterInput.negativePathContains)
+        setPositivePathContains(props.initialFilterInput.positivePathContains)
+        setNegativeTags(props.initialFilterInput.negativeTags)
+        setPositiveTags(props.initialFilterInput.positiveTags)
+    }, [props.initialFilterInput])
 
     useEffect(() => {
         const data = new FilterInputData()
