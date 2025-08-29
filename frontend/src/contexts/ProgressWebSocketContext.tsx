@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode } from 'react';
 import { useProgressWebSocket } from '@/hooks/useProgressWebSocket';
 import { ProgressMessage } from '@/types/progress';
 

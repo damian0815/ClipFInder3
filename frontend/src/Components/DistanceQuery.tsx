@@ -17,6 +17,10 @@ import { Card, CardContent } from "@/Components/ui/Card.tsx";
 
 type DistanceQueryProps = {
     setSelectedImages: (images: Image[]) => void;
+    thumbnailSizeIndex?: number;
+    onThumbnailSizeChange?: (index: number) => void;
+    onGridFocusChange?: (focused: boolean) => void;
+    onOffsetChange?: (offset: number) => void;
 }
 
 
@@ -86,6 +90,11 @@ function DistanceQuery(props: DistanceQueryProps) {
             );
         });
     }, []);
+
+    // Notify parent of offset changes
+    useEffect(() => {
+        props.onOffsetChange?.(currentOffset);
+    }, [currentOffset, props.onOffsetChange]);
 
     const restoreFromHistory = useCallback((entry: SearchHistoryEntry) => {
         console.log('Restoring search from history:', entry);
@@ -456,15 +465,14 @@ function DistanceQuery(props: DistanceQueryProps) {
                 <div className="text-green-600 mt-2">{statusMessage}</div>
             )}
             
-            <div className="text-sm text-slate-500">
-                Current offset: {currentSearchParams?.offset ?? "<undefined>"}
-            </div>
-            
             <ImageResultsGrid
                 images={resultImages}
                 onSelect={props.setSelectedImages}
                 onAddToQuery={handleAddToQuery}
                 onImageDeleted={handleImageDeleted}
+                thumbnailSizeIndex={props.thumbnailSizeIndex}
+                onThumbnailSizeChange={props.onThumbnailSizeChange}
+                onGridFocusChange={props.onGridFocusChange}
             />
             
             {searchIsRunning && (

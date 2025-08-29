@@ -1,0 +1,72 @@
+/* Modern Tabs Styling */
+.react-tabs {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.react-tabs__tab-list {
+  border-bottom: 1px solid #e2e8f0;
+  margin: 0 0 24px 0;
+  padding: 0 24px;
+  display: flex;
+  background: white;
+  border-radius: 8px 8px 0 0;
+}
+
+.react-tabs__tab {
+  display: inline-block;
+  border: none;
+  border-bottom: 2px solid transparent;
+  bottom: -1px;
+  position: relative;
+  list-style: none;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: none;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.react-tabs__tab:hover {
+  color: #334155;
+  background-color: #f8fafc;
+}
+
+.react-tabs__tab--selected {
+  background: none;
+  color: #0f172a;
+  border-bottom-color: #3b82f6;
+}
+
+.react-tabs__tab--disabled {
+  color: #cbd5e1;
+  cursor: default;
+}
+
+.react-tabs__tab:focus {
+  box-shadow: 0 0 0 2px #3b82f6;
+  border-color: #3b82f6;
+  outline: none;
+}
+
+.react-tabs__tab:focus:after {
+  content: "";
+  position: absolute;
+  height: 5px;
+  left: -4px;
+  right: -4px;
+  bottom: -5px;
+  background: #fff;
+}
+
+.react-tabs__tab-panel {
+  display: none;
+  padding: 24px;
+  background: white;
+  border-radius: 0 0 8px 8px;
+}
+
+.react-tabs__tab-panel--selected {
+  display: block;
+}

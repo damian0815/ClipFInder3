@@ -1,302 +1,222 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Image from '@/types/image';
-import { ResultImage } from '@/Components/ResultImage';
-import { MacOSQuickLook } from '@/Components/MacOSQuickLook';
-import { TagMergeProvider } from '@/contexts/TagMergeContext';
+import {useEffect, useState} from "react";
+import Image from "@/types/image";
+import { ResultImage } from "@/Components/ResultImage";
+import Selectable from 'react-selectable-box';
+import { API_BASE_URL } from "@/Constants";
+import { QuickLookOverlay } from "@/Components/QuickLookOverlay";
+import { TagMergeProvider } from "@/contexts/TagMergeContext";
 
-interface ImageResultsGridProps {
-  images: Image[];
-  onSelect: (selectedImages: Image[]) => void;
-  onAddToQuery: (image: Image) => void;
-  onImageDeleted?: (imageId: string) => void;
-  thumbnailSizeIndex?: number;
-  onThumbnailSizeChange?: (index: number) => void;
-  gridHasFocus?: boolean;
-  onGridFocusChange?: (focused: boolean) => void;
+type ImageResultsGridProps = {
+    images: Array<Image>;
+    onSelect: (selectedImages: Array<Image>) => void; // Callback to pass selected images to parent
+    onAddToQuery: (image: Image) => void;
+    onImageDeleted?: (imageId: string) => void;
+    thumbnailSizeIndex?: number;
+    onThumbnailSizeChange?: (index: number) => void;
+    onGridFocusChange?: (focused: boolean) => void;
 }
 
-function ImageResultsGrid({ 
-  images, 
-  onSelect, 
-  onAddToQuery, 
-  onImageDeleted: _ 
-}: ImageResultsGridProps) {
-  const [selectedImages, setSelectedImages] = useState<Image[]>([]);
-  const [focusedImageIndex, setFocusedImageIndex] = useState<number>(-1);
-  const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
-  const [quickLookVisible, setQuickLookVisible] = useState<boolean>(false);
-  const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(2);
-  const [selectionAnchor, setSelectionAnchor] = useState<number>(-1); // For range selection
-  const gridRef = useRef<HTMLDivElement>(null);
-  const [gridColumns, setGridColumns] = useState<number>(1);
+function ImageResultsGrid(props: ImageResultsGridProps) {
+    const [selectedImages, setSelectedImages] = useState<Array<Image>>([]);
+    const [mode, setMode] = useState<'add' | 'remove' | 'replace' | 'reverse'>('replace');
+    const [mouseIsOver, setMouseIsOver] = useState<boolean>(false);
+    const [quickLookVisible, setQuickLookVisible] = useState<boolean>(false);
+    const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
+    
+    // Use prop or default value for thumbnail size
+    const thumbnailSizeIndex = props.thumbnailSizeIndex ?? 2;
 
-  // Define Tailwind size options
-  const sizeOptions = [
-    { name: 'XS', class: 'w-16 h-16', minWidth: '4rem' },
-    { name: 'SM', class: 'w-20 h-20', minWidth: '5rem' },
-    { name: 'MD', class: 'w-32 h-32', minWidth: '8rem' },
-    { name: 'LG', class: 'w-48 h-48', minWidth: '12rem' },
-    { name: 'XL', class: 'w-64 h-64', minWidth: '16rem' },
-    { name: '2XL', class: 'w-88 h-88', minWidth: '22rem' },
-    { name: '3XL', class: 'w-112 h-112', minWidth: '28rem' },
-    { name: '4XL', class: 'w-136 h-136', minWidth: '34rem' }
-  ];
+    // Define Tailwind size options - expanded to 8 steps
+    const sizeOptions = [
+        { name: 'XS', class: 'w-16 h-16', minWidth: '4rem' },
+        { name: 'SM', class: 'w-20 h-20', minWidth: '5rem' },
+        { name: 'MD', class: 'w-32 h-32', minWidth: '8rem' },
+        { name: 'LG', class: 'w-48 h-48', minWidth: '12rem' },
+        { name: 'XL', class: 'w-64 h-64', minWidth: '16rem' },
+        { name: '2XL', class: 'w-88 h-88', minWidth: '22rem' },
+        { name: '3XL', class: 'w-112 h-112', minWidth: '28rem' },
+        { name: '4XL', class: 'w-136 h-136', minWidth: '34rem' }
+    ];
 
-  const currentSize = sizeOptions[thumbnailSizeIndex];
+    const currentSize = sizeOptions[thumbnailSizeIndex];
 
-  // Calculate grid columns based on container width and thumbnail size
-  useEffect(() => {
-    const updateGridColumns = () => {
-      if (!gridRef.current) return;
-      
-      const containerWidth = gridRef.current.offsetWidth;
-      const thumbnailWidth = parseInt(currentSize.minWidth) * 16; // Convert rem to px
-      const columns = Math.floor(containerWidth / (thumbnailWidth + 16)); // 16px for gap
-      setGridColumns(Math.max(1, columns));
+    // Get the last selected image for Quick Look
+    const lastSelectedImage = selectedImages.length > 0 ? selectedImages[selectedImages.length - 1] : null;
+
+    const handleImageClick = (ev: React.MouseEvent, img: Image) => {
+        if (ev.shiftKey || ev.metaKey) {
+            const isSelected = selectedImages.includes(img);
+            if (!isSelected) {
+                setSelectedImages([...selectedImages, img]);
+            } else {
+                setSelectedImages(selectedImages.filter(selectedImg => selectedImg !== img));
+            }
+        } else {
+            // Default behavior: replace selection
+            setSelectedImages([img]);
+        }
     };
 
-    updateGridColumns();
-    window.addEventListener('resize', updateGridColumns);
-    return () => window.removeEventListener('resize', updateGridColumns);
-  }, [currentSize.minWidth]);
+    const handleRevealInFinder = (img: Image) => {
+        console.log("reveal in finder for image", img);
+        fetch(`${API_BASE_URL}/api/revealInFinder/${img.id}`);
+    };
 
-  // Handle keyboard navigation
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!gridHasFocus || images.length === 0) return;
+    useEffect(() => {
+        console.log("passing up:", selectedImages);
+        props.onSelect(selectedImages); // Pass the selected images to the parent
+    }, [selectedImages])
 
-    let newIndex = focusedImageIndex;
-    
-    switch (e.key) {
-      case 'ArrowLeft':
-        e.preventDefault();
-        newIndex = Math.max(0, focusedImageIndex - 1);
-        break;
+    // Notify parent of grid focus changes
+    useEffect(() => {
+        props.onGridFocusChange?.(gridHasFocus);
+    }, [gridHasFocus, props.onGridFocusChange]);
+
+    useEffect(() => {
         
-      case 'ArrowRight':
-        e.preventDefault();
-        newIndex = Math.min(images.length - 1, focusedImageIndex + 1);
-        break;
-        
-      case 'ArrowUp':
-        e.preventDefault();
-        newIndex = Math.max(0, focusedImageIndex - gridColumns);
-        break;
-        
-      case 'ArrowDown':
-        e.preventDefault();
-        newIndex = Math.min(images.length - 1, focusedImageIndex + gridColumns);
-        break;
-        
-      case ' ':
-        e.preventDefault();
-        if (focusedImageIndex >= 0) {
-          setQuickLookVisible(!quickLookVisible);
-        }
-        break;
-        
-      case 'Escape':
-        e.preventDefault();
-        if (quickLookVisible) {
-          setQuickLookVisible(false);
-        } else {
-          // Clear selection when Escape is pressed and QuickLook isn't open
-          setSelectedImages([]);
-          onSelect([]);
-          setSelectionAnchor(-1);
-          setGridHasFocus(false);
-          setFocusedImageIndex(-1);
-        }
-        break;
-        
-      case 'Enter':
-        e.preventDefault();
-        if (focusedImageIndex >= 0) {
-          const focusedImage = images[focusedImageIndex];
-          if (e.shiftKey || e.metaKey) {
-            // Add to selection
-            const isAlreadySelected = selectedImages.includes(focusedImage);
-            if (isAlreadySelected) {
-              // Remove from selection
-              const newSelection = selectedImages.filter(img => img !== focusedImage);
-              setSelectedImages(newSelection);
-              onSelect(newSelection);
+        const updateMode = (e: KeyboardEvent) => {
+            const shiftIsDown = e.shiftKey || (e.type === 'keydown' && e.key === 'Shift');
+            const metaIsDown = e.metaKey || (e.type === 'keydown' && e.key === 'Meta');
+            const altIsDown = e.altKey || (e.type === 'keydown' && e.key === 'Alt');
+
+            // Handle Space key for Quick Look
+            if (e.type === 'keydown' && e.key === ' ' && gridHasFocus) {
+                console.log("caught space key, lastSelectedImage:", lastSelectedImage, "quickLookVisible:", quickLookVisible);
+                if (lastSelectedImage && !quickLookVisible) {
+                    console.log("showing QuickLook for", lastSelectedImage)
+                    e.preventDefault();
+                    setQuickLookVisible(true);
+                    return;
+                }
+            }
+
+            if (shiftIsDown || metaIsDown) {
+                setMode('add')
+                console.log('mode was', mode, 'now add')
+            } else if (altIsDown) {
+                setMode('remove')
+                console.log('mode was', mode, 'now remove')
             } else {
-              // Add to selection
-              const newSelection = [...selectedImages, focusedImage];
-              setSelectedImages(newSelection);
-              onSelect(newSelection);
+                console.log('mode was', mode, 'now replace')
+                setMode('replace')
             }
-          } else {
-            // Replace selection and set anchor
-            setSelectedImages([focusedImage]);
-            onSelect([focusedImage]);
-            setSelectionAnchor(focusedImageIndex);
-          }
+        };
+
+        document.addEventListener('keydown', updateMode);
+        document.addEventListener('keyup', updateMode);
+
+        return () => {
+            document.removeEventListener('keydown', updateMode);
+            document.removeEventListener('keyup', updateMode);
+        };
+    }, [mode, lastSelectedImage, quickLookVisible, gridHasFocus]);
+
+    const handleMergeComplete = async (sourceImage: Image, targetImage: Image) => {
+        console.log("Merging tags to:", targetImage.path, "From source tags:", sourceImage.tags);
+
+        try {
+            // Get current tags of target image to avoid duplicates
+            const currentTags = targetImage.tags || [];
+            const sourceTags = sourceImage.tags || [];
+            const tagsToAdd = sourceTags.filter((tag: string) => !currentTags.includes(tag));
+
+            if (tagsToAdd.length === 0) {
+                console.log("No new tags to add - all source tags already exist on target image");
+                // Still delete source image even if no tags were added
+            } else {
+                // Add each new tag to the target image
+                for (const tag of tagsToAdd) {
+                    await fetch(`${API_BASE_URL}/api/addTag`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            image_ids: [targetImage.id],
+                            tag_to_add: tag
+                        })
+                    });
+                }
+
+                console.log(`Successfully merged ${tagsToAdd.length} tags to ${targetImage.path}`);
+            }
+
+            // Delete the source image via API
+            const deleteResult = await fetch(`${API_BASE_URL}/api/image/${sourceImage.id}`, {
+                method: 'DELETE'
+            });
+            if (!deleteResult.ok) {
+                console.error("Error deleting source image:", deleteResult.statusText, await deleteResult.text());
+            } else {
+                // Remove the source image from local state
+                if (props.onImageDeleted) {
+                    props.onImageDeleted(sourceImage.id);
+                }
+            }
+
+        } catch (error) {
+            console.error("Error merging tags:", error);
         }
-        break;
-    }
-    
-    if (newIndex !== focusedImageIndex && newIndex >= 0 && newIndex < images.length) {
-      setFocusedImageIndex(newIndex);
-      scrollToImage(newIndex);
-      
-      if (e.shiftKey && selectionAnchor >= 0) {
-        // Extend selection from anchor to new position
-        const startIndex = Math.min(selectionAnchor, newIndex);
-        const endIndex = Math.max(selectionAnchor, newIndex);
-        const rangeSelection = images.slice(startIndex, endIndex + 1);
-        
-        setSelectedImages(rangeSelection);
-        onSelect(rangeSelection);
-      } else if (!e.shiftKey) {
-        // Normal navigation without shift - set new anchor but don't change selection unless nothing is selected
-        setSelectionAnchor(newIndex);
-        
-        // Only auto-select if no current selection
-        if (selectedImages.length === 0) {
-          const focusedImage = images[newIndex];
-          setSelectedImages([focusedImage]);
-          onSelect([focusedImage]);
-        }
-      }
-      // If shift is held but no anchor, don't change selection
-    }
-  }, [gridHasFocus, focusedImageIndex, images, quickLookVisible, gridColumns, selectedImages, onSelect, selectionAnchor]);
+    };
 
-  const scrollToImage = (index: number) => {
-    const imageElement = gridRef.current?.children[1]?.children[index] as HTMLElement; // Skip the controls div
-    if (imageElement) {
-      imageElement.scrollIntoView({
-        behavior: 'auto', // Changed from 'smooth' to 'auto' for immediate response
-        block: 'nearest',
-        inline: 'nearest'
-      });
-    }
-  };
+    return (
+        <TagMergeProvider onMergeComplete={handleMergeComplete}>
+            <div>
+                <div
+                    className="grid gap-5 mt-5 p-4 border border-gray-300"
+                    style={{
+                        gridTemplateColumns: `repeat(auto-fill, minmax(${currentSize.minWidth}, 1fr))`
+                    }}
+                    tabIndex={0}
+                    onMouseEnter={() => setMouseIsOver(true)}
+                    onMouseLeave={() => setMouseIsOver(false)}
+                    onFocus={() => setGridHasFocus(true)}
+                    onBlur={() => setGridHasFocus(false)}
+                    onClick={() => setGridHasFocus(true)}
+                >
+                    <Selectable
+                        disabled={!mouseIsOver}
+                        mode={mode === 'replace' ? 'reverse' : mode}
+                        value={selectedImages}
+                        onEnd={(newSelectedImages, { added, removed }) => {
+                            switch (mode) {
+                                case 'add':
+                                case 'remove':
+                                case 'reverse':
+                                    setSelectedImages(selectedImages.concat(added).filter((i) => !removed.includes(i)));
+                                    break;
+                                case 'replace':
+                                    setSelectedImages(newSelectedImages)
+                                    break
+                            }
+                        }}
+                    >
 
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+                        {props.images.map((img) => (
+                            <ResultImage
+                                key={img.id}
+                                image={img}
+                                isSelected={selectedImages.includes(img)}
+                                onClick={(ev) => handleImageClick(ev, img)}
+                                onAddToQuery={() => props.onAddToQuery(img)}
+                                onRevealInFinder={() => handleRevealInFinder(img)}
+                                className={currentSize.class}
+                            />
+                        ))}
 
-  const handleGridClick = (e: React.MouseEvent) => {
-    // Focus grid when clicking on the grid container
-    if (e.target === e.currentTarget) {
-      setGridHasFocus(true);
-      if (images.length > 0 && focusedImageIndex === -1) {
-        setFocusedImageIndex(0);
-      }
-    }
-  };
+                    </Selectable>
 
-  const handleImageClick = (e: React.MouseEvent, image: Image) => {
-    const index = images.findIndex(img => img.id === image.id);
-    setGridHasFocus(true);
-    setFocusedImageIndex(index);
-    
-    if (e.shiftKey || e.metaKey) {
-      const isSelected = selectedImages.includes(image);
-      let newSelection: Image[];
-      if (isSelected) {
-        newSelection = selectedImages.filter(img => img !== image);
-      } else {
-        newSelection = [...selectedImages, image];
-      }
-      setSelectedImages(newSelection);
-      onSelect(newSelection);
-    } else {
-      // Regular click - replace selection and set anchor
-      setSelectedImages([image]);
-      onSelect([image]);
-      setSelectionAnchor(index);
-    }
-  };
+                    {quickLookVisible && lastSelectedImage && (
+                        <QuickLookOverlay
+                            image={lastSelectedImage}
+                            onClose={() => setQuickLookVisible(false)}
+                        />
+                    )}
 
-  const focusedImage = focusedImageIndex >= 0 ? images[focusedImageIndex] : null;
-
-  return (
-    <TagMergeProvider>
-      <div className="space-y-4">
-        {/* Image Grid */}
-        <div
-          ref={gridRef}
-          className={`grid gap-4 p-4 min-h-[200px] outline-none rounded-lg border-2 ${
-            gridHasFocus 
-              ? 'border-blue-500 bg-blue-50/30' 
-              : 'border-slate-200 hover:border-slate-300'
-          }`}
-          style={{
-            gridTemplateColumns: `repeat(auto-fill, minmax(${currentSize.minWidth}, 1fr))`
-          }}
-          onClick={handleGridClick}
-          tabIndex={0}
-          onFocus={() => {
-            setGridHasFocus(true);
-            if (images.length > 0 && focusedImageIndex === -1) {
-              setFocusedImageIndex(0);
-            }
-          }}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget)) {
-              setGridHasFocus(false);
-            }
-          }}
-        >
-          {images.map((image, index) => {
-            const isFocused = index === focusedImageIndex;
-            const isSelected = selectedImages.includes(image);
-            
-            return (
-              <div
-                key={image.id}
-                className={`relative ${
-                  isFocused 
-                    ? 'ring-2 ring-yellow-400 ring-offset-2 scale-105' 
-                    : ''
-                } ${
-                  isSelected
-                    ? 'ring-2 ring-blue-500 ring-offset-1'
-                    : ''
-                }`}
-              >
-                <ResultImage
-                  image={image}
-                  isSelected={isSelected}
-                  onClick={(e, img) => handleImageClick(e, img)}
-                  onAddToQuery={onAddToQuery}
-                  onRevealInFinder={() => {}} // TODO: implement if needed
-                  className={currentSize.class}
-                />
-                {/* Selection indicator */}
-                {isSelected && (
-                  <div className="absolute top-1 right-1 w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
-                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        
-        {/* Status */}
-        {images.length === 0 && (
-          <div className="text-center py-12 text-slate-500">
-            No images to display
-          </div>
-        )}
-      </div>
-      
-      {/* macOS-style QuickLook */}
-      {quickLookVisible && focusedImage && (
-        <MacOSQuickLook
-          image={focusedImage}
-          onClose={() => setQuickLookVisible(false)}
-        />
-      )}
-    </TagMergeProvider>
-  );
+                </div>
+            </div>
+        </TagMergeProvider>
+    );
 }
 
 export default ImageResultsGrid;

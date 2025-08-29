@@ -12,6 +12,9 @@ import { Button } from "@/Components/ui/Button.tsx";
 
 type ZeroShotClassificationQueryProps = {
     setSelectedImages: (images: Image[]) => void;
+    thumbnailSizeIndex?: number;
+    onThumbnailSizeChange?: (index: number) => void;
+    onGridFocusChange?: (focused: boolean) => void;
 }
 
 type ZeroShotClassification = {
@@ -22,7 +25,6 @@ type ZeroShotClassification = {
 }
 
 let zeroShotResultsCache: ZeroShotClassification[] = []
-function getZeroShotResults() { return zeroShotResultsCache }
 function setZeroShotResults(results: ZeroShotClassification[]) { zeroShotResultsCache = results }
 
 function getLastQuery(): ZeroShotClassificationInputData {
@@ -104,10 +106,11 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
         selectedImagesPerClass[clsId] = images;
         const allSelectedImages = Object.values(selectedImagesPerClass).flatMap((si) => si);
         props.setSelectedImages(allSelectedImages);
+        setSelectedImagesPerClass({...selectedImagesPerClass})
         console.log("all selected images:", allSelectedImages);
     }
 
-    function handleAddToQuery(i: Image): void {
+    function handleAddToQuery(_: Image): void {
         throw new Error("Function not implemented.");
     }
 
@@ -139,7 +142,11 @@ function ZeroShotClassificationQuery(props: ZeroShotClassificationQueryProps) {
                         <ImageResultsGrid 
                             images={thisClsImages} 
                             onAddToQuery={(i) => handleAddToQuery(i)}
-                            onSelect={(si) => selectedImagesUpdated(clsId, si)} />
+                            onSelect={(si) => selectedImagesUpdated(clsId, si)}
+                            thumbnailSizeIndex={props.thumbnailSizeIndex}
+                            onThumbnailSizeChange={props.onThumbnailSizeChange}
+                            onGridFocusChange={props.onGridFocusChange}
+                        />
                         </>
                     })}
                 </MultiColumn>

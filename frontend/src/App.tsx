@@ -18,6 +18,9 @@ function App() {
 
     const [selectedImages, setSelectedImages] = useState<Image[]>([]);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [thumbnailSizeIndex, setThumbnailSizeIndex] = useState<number>(2);
+    const [gridHasFocus, setGridHasFocus] = useState<boolean>(false);
+    const [currentOffset, setCurrentOffset] = useState<number | undefined>(undefined);
 
     const toggleSidebar = () => {
         setSidebarOpen(!sidebarOpen);
@@ -47,10 +50,21 @@ function App() {
                               </TabList>
 
                               <TabPanel>
-                                  <DistanceQuery setSelectedImages={setSelectedImages}/>
+                                  <DistanceQuery 
+                                    setSelectedImages={setSelectedImages}
+                                    thumbnailSizeIndex={thumbnailSizeIndex}
+                                    onThumbnailSizeChange={setThumbnailSizeIndex}
+                                    onGridFocusChange={setGridHasFocus}
+                                    onOffsetChange={setCurrentOffset}
+                                  />
                               </TabPanel>
                               <TabPanel>
-                                  <ZeroShotClassificationQuery setSelectedImages={setSelectedImages}/>
+                                  <ZeroShotClassificationQuery 
+                                    setSelectedImages={setSelectedImages}
+                                    thumbnailSizeIndex={thumbnailSizeIndex}
+                                    onThumbnailSizeChange={setThumbnailSizeIndex}
+                                    onGridFocusChange={setGridHasFocus}
+                                  />
                               </TabPanel>
                           </Tabs>
                         </div>
@@ -67,7 +81,13 @@ function App() {
                     />
               </div>
 
-              <MainStatusBar selectedImages={selectedImages} />
+              <MainStatusBar 
+                selectedImages={selectedImages} 
+                thumbnailSizeIndex={thumbnailSizeIndex}
+                onThumbnailSizeChange={setThumbnailSizeIndex}
+                gridHasFocus={gridHasFocus}
+                currentOffset={currentOffset}
+              />
             </div>
         </ProgressWebSocketProvider>
   );

@@ -11,7 +11,7 @@ interface CLIPEmbeddingInputProps {
 const CLIPEmbeddingInput = ({ id, value, onChange, className = '' }: CLIPEmbeddingInputProps) => {
   const handleValueChange = (newValue: string) => {
     const updatedValue = new EmbeddingInputData({
-      id: value.id,
+      id: id,
       text: value.mode === 'text' ? newValue : value.text,
       imageId: value.mode === 'image' ? newValue : value.imageId,
       tags: value.mode === 'tags' ? newValue.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : value.tags,
