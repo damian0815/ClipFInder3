@@ -6,6 +6,7 @@ import threading
 import uuid
 import os
 from typing import List, Literal, Optional
+import send2trash
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -123,7 +124,7 @@ class SearchRequest(BaseModel):
 async def search_images(search_params: SearchRequest, background_tasks: BackgroundTasks):
     query = search_params.query
     task_id = search_params.task_id
-    print(f'starting search - "{query}"')
+    print(f'starting search - texts {query.texts}, {len(query.image_ids or [])} image ids, {len(query.embeddings or [])} raw embeddings, {query.sort_order}')
 
     def perform_search_task_from_thread():
         asyncio.run(
@@ -141,6 +142,17 @@ async def search_images(search_params: SearchRequest, background_tasks: Backgrou
         message="Search started. Use WebSocket to receive progress updates."
     )
 
+@app.get("/api/moveToTrash/{id}")
+async def move_image_to_trash(id: str):
+    file_path = embedding_store.get_image_path_for_id(id)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail=f"Image not found: {file_path}")
+    try:
+        send2trash.send2trash(file_path)
+        embedding_store.remove_image(id)
+        return {"message": f"Image {id} moved to trash successfully", "path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to move image to trash: {str(e)}")
 
 @app.get("/api/image/{id}")
 async def serve_image(id: str):
@@ -328,6 +340,7 @@ async def serve_thumbnail(id: str):
 async def cleanup_missing_images():
     try:
         embedding_store.cleanup_missing_files()
+        embedding_store.save()
     except Exception as e:
         logging.error(f"Error during cleanup: {repr(e)}")
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")

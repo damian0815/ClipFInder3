@@ -20,6 +20,7 @@ import {ResultCounts, SortOrder} from "@/types/searchResults.ts";
 type DistanceQueryProps = {
     setSelectedImages: (images: Image[]) => void;
     onRevealInFinder: (image: Image) => void;
+    onMoveToTrash: (image: Image) => boolean;
     thumbnailSize: number;
     gridHasFocus: boolean;
     onGridFocusChange: (focused: boolean) => void;
@@ -436,6 +437,16 @@ function DistanceQuery(props: DistanceQueryProps) {
         setResultImages(prev => prev.filter(img => img.id !== imageId));
     };*/
 
+    const handleMoveToTrash = (image: Image) => {
+        const trashed = props.onMoveToTrash(image);
+        if (trashed) {
+            // Optimistically remove from results
+            setResultImages(prev => prev.filter(img => img.id !== image.id));
+            setResultCounts(prev => ({fetched: Math.max(0, prev.fetched - 1), total: Math.max(0, prev.total - 1)}));
+        }
+        return trashed
+    }
+
     // Don't render until initialized
     if (!embeddingInputs || !filterInput) {
         return <div>Loading...</div>;
@@ -561,6 +572,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                 onSelect={props.setSelectedImages}
                 onAddToQuery={handleAddToQuery}
                 onRevealInFinder={props.onRevealInFinder}
+                onMoveToTrash={handleMoveToTrash}
                 thumbnailSize={props.thumbnailSize}
                 gridHasFocus={props.gridHasFocus}
                 onGridFocusChange={props.onGridFocusChange}

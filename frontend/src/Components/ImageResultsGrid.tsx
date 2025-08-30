@@ -9,6 +9,7 @@ interface ImageResultsGridProps {
   onSelect: (selectedImages: Image[]) => void;
   onAddToQuery: (image: Image) => void;
   onRevealInFinder: (image: Image) => void;
+  onMoveToTrash: (image: Image) => boolean;
   thumbnailSize: number;
   gridHasFocus: boolean;
   onGridFocusChange: (focused: boolean) => void;
@@ -19,6 +20,7 @@ function ImageResultsGrid({
   onSelect,
   onAddToQuery,
   onRevealInFinder,
+  onMoveToTrash,
   thumbnailSize,
   gridHasFocus,
   onGridFocusChange
@@ -202,6 +204,18 @@ function ImageResultsGrid({
     }
   };
 
+  const handleMoveToTrash = (image: Image) => {
+    const trashed = onMoveToTrash(image);
+    if (trashed) {
+      if (selectedImages.includes(image)) {
+        const newSelection = selectedImages.filter(img => img !== image);
+        setSelectedImages(newSelection);
+        onSelect(newSelection);
+      }
+    }
+    return trashed
+  }
+
   const focusedImage = focusedImageIndex >= 0 ? images[focusedImageIndex] : null;
 
   return (
@@ -253,7 +267,8 @@ function ImageResultsGrid({
                   isSelected={isSelected}
                   onClick={(e, img) => handleImageClick(e, img)}
                   onAddToQuery={onAddToQuery}
-                  onRevealInFinder={onRevealInFinder} // TODO: implement if needed
+                  onRevealInFinder={onRevealInFinder}
+                  onMoveToTrash={handleMoveToTrash}
                   className={`w-${thumbnailSize} h-${thumbnailSize}`}
                 />
                 {/* Selection indicator */}

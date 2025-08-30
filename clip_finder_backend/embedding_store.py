@@ -144,7 +144,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         self.texts = []
         self.image_ids = str(uuid.uuid4() for _ in range(len(self.image_paths)))
         if readonly:
-            self.image_hases = []
+            self.image_hashes = []
         else:
             self.image_hashes = [_compute_md5_hash(p) if os.path.exists(p) else 0
                                  for p in tqdm(self.image_paths, desc='Computing md5 hashes for images')
@@ -224,7 +224,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
     def search_images(
             self,
             query: Query,
-            progress_callback: Callable[[float, str], None] = None,
+            progress_callback: Optional[Callable[[float, str], None]] = None,
             return_total_available: bool = False
     ) -> tuple[list[QueryResult], int] | list[QueryResult]:
         weights = list(query.weights)
@@ -478,7 +478,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
         index = self.image_ids.index(id)
         del self.image_ids[index]
         del self.image_paths[index]
-        del self.image_hases[index]
+        del self.image_hashes[index]
         self.image_embeddings = self.image_embeddings[torch.arange(self.image_embeddings.shape[0]) != index]
 
 
@@ -573,27 +573,54 @@ class ShardedEmbeddingStore(EmbeddingStore):
             embedding = shard.get_image_embedding(path)
             if embedding is not None:
                 return embedding
+        raise ValueError("no such path")
 
     def get_text_embedding(self, text: str) -> torch.Tensor:
         return self.clip_model.get_text_features(text)
 
-    def search_images(self, query: Query, progress_callback: Callable[[float, str], None]=None) -> List[QueryResult]:
+    def search_images(
+            self,
+            query: Query,
+            progress_callback: Optional[Callable[[float, str], None]] = None,
+            return_total_available: bool = False
+    ) -> tuple[list[QueryResult], int] | list[QueryResult]:
         results = []
-        offset = query.offset
-        limit = query.limit
-        query.offset = 0
-        query.limit = offset + limit
+        total_available = 0
+        if query.sort_order == 'semantic_page':
+            raise ValueError("semantic_page sort order is not supported in sharded stores")
 
-        progress_per_shard = 1.0 / len(self.shards)
+        # Temporarily modify query to get all results from each shard
+        original_offset = query.offset
+        original_limit = query.limit
+        query.offset = 0
+        query.limit = original_offset + original_limit
+
+        progress_per_shard = 1.0 / len(self.shards) if self.shards else 1.0
         for shard_index, shard in enumerate(tqdm(self.shards, leave=False)):
             def progress_callback_internal(progress, message):
                 if progress_callback:
                     progress_callback(progress_per_shard * (shard_index + progress),
                                   f"shard {shard_index}: {message}")
-            results.extend(shard.search_images(query, progress_callback_internal))
-        results = sorted(results, key=lambda r: r.distance)
-        return results[offset:offset+limit]
 
+            shard_results, shard_total = shard.search_images(query, progress_callback_internal, return_total_available=True)
+            total_available += shard_total
+            results.extend(shard_results)
+
+        # Restore original query parameters
+        query.offset = original_offset
+        query.limit = original_limit
+
+        # Sort all results by similarity (descending by default)
+        ascending_order = query.sort_order == 'similarity_asc' or query.sort_order == 'similarity_max_asc'
+        results = sorted(results, key=lambda r: r.similarity, reverse=not ascending_order)
+
+        # Apply pagination to the combined results
+        paginated_results = results[original_offset:original_offset + original_limit]
+
+        if return_total_available:
+            return paginated_results, total_available
+        else:
+            return paginated_results
 
     def has_image(self, path: str) -> bool:
         for shard in self.shards:

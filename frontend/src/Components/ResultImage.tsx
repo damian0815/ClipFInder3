@@ -9,6 +9,7 @@ export type ResultImageProps = {
   onClick: (event: React.MouseEvent, image: Image) => void;
   onAddToQuery: (img: Image) => void;
   onRevealInFinder: (img: Image) => void;
+  onMoveToTrash
   isSelected: boolean;
   className?: string;
 };
@@ -39,7 +40,7 @@ export function ResultImage(props: ResultImageProps) {
 
   return <div
       ref={setNodeRef}
-      className={"p-2"}
+      className={"p-0"}
       style={{
             border: isAdding ? '2px solid blue' : (isRemoving ? '2px solid red' : '2px solid transparent'), 
             background: isSelected ? '#3b82f6' : 'transparent', // More prominent blue background
@@ -70,6 +71,12 @@ export function ResultImage(props: ResultImageProps) {
               onClick={() => props.onRevealInFinder(props.image)}
             >
               Reveal in Finder
+            </ContextMenu.Item>
+            <ContextMenu.Item
+              className="px-3 py-2 text-sm hover:bg-blue-100 rounded cursor-pointer"
+              onClick={() => props.onMoveToTrash(props.image)}
+            >
+              Move to Trash
             </ContextMenu.Item>
             <ContextMenu.Separator className="h-px bg-gray-300 my-1" />
             <ContextMenu.Item
