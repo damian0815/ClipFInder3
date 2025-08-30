@@ -5,6 +5,7 @@ import traceback
 import threading
 import uuid
 import os
+from math import floor
 from typing import List, Literal, Optional
 import send2trash
 
@@ -212,7 +213,7 @@ async def get_images_by_tags(input: ImagesByTagsInput, background_tasks: Backgro
 class GetEmbeddingsRequest(BaseModel):
     texts: list[str]|None = None
     image_ids: list[str] = None
-    reduction: Literal['mean_norm', 'none'] = 'mean_norm'
+    reduction: Literal['mean_norm', 'geometric_mean', 'mean_no_outliers', 'none'] = 'mean_norm'
 
 @app.post("/api/embeddings")
 async def get_embeddings(request: GetEmbeddingsRequest):
@@ -226,14 +227,35 @@ async def get_embeddings(request: GetEmbeddingsRequest):
         all_embeddings.append(image_embeddings)
     all_embeddings = torch.cat(all_embeddings, dim=0) if all_embeddings else torch.empty(0)
 
-    if request.reduction == 'mean_norm':
-        all_embeddings = all_embeddings.mean(dim=0, keepdim=False) # shape: [emb_dim]
+    if all_embeddings.shape[0] < 2 or request.reduction == 'none':
+        result = all_embeddings
+    elif request.reduction == 'mean_norm':
+        mean = all_embeddings.mean(dim=0, keepdim=False) # shape: [emb_dim]
+        result = mean / torch.norm(mean)
+    #elif request.reduction == 'geometric_mean':
+    #    mean = all_embeddings.log().mean(dim=0, keepdim=False).exp()
+    #    result = mean / torch.norm(mean)
+    elif request.reduction == 'mean_no_outliers':
+        distance_matrix = all_embeddings @ all_embeddings.T
+        coherence = distance_matrix.sum(dim=1)
+        mean_coherence = coherence.mean()
+        std_coherence = coherence.std()
+        filtered = all_embeddings[coherence > (mean_coherence - std_coherence)]
+        if len(filtered) == 0:
+            # whoops, all were outliers
+            coherence_sorted = torch.argsort(coherence)
+            midpoint = floor(coherence_sorted.shape[0]/2)
+            filtered = all_embeddings[midpoint:midpoint+1]
+            mean = filtered.mean(dim=0, keepdim=False)
+        else:
+            mean = filtered.mean(dim=0, keepdim=False)
+        result = mean / torch.norm(mean)
     elif request.reduction == 'none':
-        pass
-    else: 
+        result = all_embeddings
+    else:
         raise HTTPException(status_code=400, detail=f"Unknown reduction method: {request.reduction}")
     
-    return { 'embedding': all_embeddings.cpu().tolist() }
+    return { 'embedding': result.cpu().tolist() }
 
 @app.post("/api/zero-shot-classify")
 async def zero_shot_classify(request: ZeroShotClassifyRequest):

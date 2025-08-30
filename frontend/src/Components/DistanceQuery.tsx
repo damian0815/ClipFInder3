@@ -317,7 +317,7 @@ function DistanceQuery(props: DistanceQueryProps) {
                         // For tags, get image IDs and then embeddings
                         const tagImageIds = await getImageIdsForTags(input.tags);
                         if (tagImageIds.length > 0) {
-                            embedding = await getEmbeddings(undefined, tagImageIds, 'mean_norm');
+                            embedding = await getEmbeddings(undefined, tagImageIds, "mean_no_outliers");
                         } else {
                             throw new Error(`No images found for tags: ${input.tags.join(', ')}`);
                         }
@@ -436,7 +436,7 @@ function DistanceQuery(props: DistanceQueryProps) {
         console.log("Removing deleted image from results:", imageId);
         setResultImages(prev => prev.filter(img => img.id !== imageId));
     };*/
-
+    
     const handleMoveToTrash = (image: Image) => {
         const trashed = props.onMoveToTrash(image);
         if (trashed) {
@@ -555,6 +555,8 @@ function DistanceQuery(props: DistanceQueryProps) {
                     <option value="similarity_asc">Least Similarity Sum</option>
                     <option value="similarity_max">Similarity Max</option>
                     <option value="similarity_max_asc">Similarity Min</option>
+                    <option value="similarity_avg">Similarity Average</option>
+                    <option value="similarity_avg_asc">Least Similarity Average</option>
                     <option value="direction">Direction ←</option>
                     <option value="direction_rev">Direction →</option>
                     <option value="semantic_page">Semantic (by page)</option>

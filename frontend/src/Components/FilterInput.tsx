@@ -1,5 +1,6 @@
 import {FilterInputData} from "@/Datatypes/EmbeddingInputData.tsx";
 import {useEffect, useState} from "react";
+import DebouncedTextField from "@/Components/DebouncedTextField.tsx";
 
 type FilterInputProps = {
     initialFilterInput: FilterInputData
@@ -34,11 +35,11 @@ export function FilterInput(props: FilterInputProps) {
         <div className={"p-1 w-full grid grid-cols-4 gap-2"}>
             <label>
                 Required path (partial)
-                <input
+                <DebouncedTextField
                     type="text"
                     placeholder="Path contains"
                     value={positivePathContains}
-                    onChange={(e) => setPositivePathContains(e.target.value)}
+                    setDebouncedValue={setPositivePathContains}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                             props.onEnterPressed && props.onEnterPressed();
@@ -49,11 +50,11 @@ export function FilterInput(props: FilterInputProps) {
             </label>
             <label>
                 Excluded path (partial)
-                <input
+                <DebouncedTextField
                     type="text"
                     placeholder="Not path contains"
                     value={negativePathContains}
-                    onChange={(e) => setNegativePathContains(e.target.value)}
+                    setDebouncedValue={setNegativePathContains}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                             props.onEnterPressed && props.onEnterPressed();
@@ -64,11 +65,11 @@ export function FilterInput(props: FilterInputProps) {
             </label>
             <label>
                 Required Tags
-                <input
+                <DebouncedTextField
                     type="text"
                     placeholder="Tags (positive, comma-separated)"
                     value={positiveTags}
-                    onChange={(e) => setPositiveTags(e.target.value)}
+                    setDebouncedValue={setPositiveTags}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                             props.onEnterPressed && props.onEnterPressed();
@@ -79,11 +80,11 @@ export function FilterInput(props: FilterInputProps) {
             </label>
             <label>
                 Excluded Tags
-                <input
+                <DebouncedTextField
                     type="text"
                     placeholder="Tags (negative, comma-separated)"
                     value={negativeTags}
-                    onChange={(e) => setNegativeTags(e.target.value)}
+                    setDebouncedValue={setNegativeTags}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                             props.onEnterPressed && props.onEnterPressed();

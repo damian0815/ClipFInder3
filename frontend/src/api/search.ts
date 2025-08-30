@@ -72,7 +72,7 @@ export async function startSearchWithTaskId(searchParams: SearchParams, taskId: 
  * @param reduction Reduction method (e.g., 'mean_norm')
  * @returns Promise that resolves to embedding array
  */
-export async function getEmbeddings(texts?: string[], image_ids?: string[], reduction: string = 'mean_norm'): Promise<number[]> {
+export async function getEmbeddings(texts?: string[], image_ids?: string[], reduction: 'mean_norm' | 'none' | 'mean_no_outliers' = 'mean_no_outliers'): Promise<number[]> {
     try {
         const body: any = { reduction };
         if (texts && texts.length > 0) body.texts = texts;

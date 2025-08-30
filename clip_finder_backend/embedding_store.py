@@ -34,6 +34,7 @@ class Query(BaseModel):
     limit: int = 100
     sort_order: Literal['similarity', 'similarity_asc', 
                         'similarity_max', 'similarity_max_asc', 
+                        'similarity_avg', 'similarity_avg_asc',
                         'direction', 'direction_rev', 'semantic_page'] = 'similarity'
 
     @staticmethod
@@ -323,6 +324,12 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             if query.sort_order == 'direction_rev':
                 direction = -direction
             final_similarities = torch.matmul(corpus_embeddings, direction.unsqueeze(-1)).squeeze(-1)
+        elif query.sort_order == 'similarity_avg' or query.sort_order == 'similarity_avg_asc':
+            # Take weighted mean of embeddings before computing similarities
+            weighted_embeddings = all_query_embeddings * weights.unsqueeze(-1)
+            mean_embedding = weighted_embeddings.sum(dim=0) / weights.sum()
+            mean_embedding /= mean_embedding.norm()
+            final_similarities = torch.matmul(corpus_embeddings, mean_embedding.unsqueeze(-1)).squeeze(-1)
         else:
             similarities = torch.matmul(all_query_embeddings, corpus_embeddings.T)
             weighted_similarities = (similarities.T * weights).T
@@ -331,7 +338,7 @@ class SimpleClipEmbeddingStore(EmbeddingStore):
             else:
                 final_similarities = weighted_similarities.sum(dim=0)
 
-        ascending_order = query.sort_order == 'similarity_asc' or query.sort_order == 'similarity_max_asc'
+        ascending_order = query.sort_order == 'similarity_asc' or query.sort_order == 'similarity_max_asc' or query.sort_order == 'similarity_avg_asc'
         ordered_indices = torch.argsort(final_similarities, dim=0, descending=not ascending_order)
 
         if progress_callback is not None:
@@ -611,7 +618,7 @@ class ShardedEmbeddingStore(EmbeddingStore):
         query.limit = original_limit
 
         # Sort all results by similarity (descending by default)
-        ascending_order = query.sort_order == 'similarity_asc' or query.sort_order == 'similarity_max_asc'
+        ascending_order = query.sort_order == 'similarity_asc' or query.sort_order == 'similarity_max_asc' or query.sort_order == 'similarity_avg_asc'
         results = sorted(results, key=lambda r: r.similarity, reverse=not ascending_order)
 
         # Apply pagination to the combined results
