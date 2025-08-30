@@ -6,7 +6,7 @@ import threading
 import uuid
 import os
 from math import floor
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Any
 import send2trash
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,9 +15,10 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Back
 from pydantic import BaseModel
 import torch
 
-from clip_finder_backend.clip_modelling import AutoloadingClipModel
+from clip_finder_backend.clip_modelling import AutoloadingClipModel, ClipModel
+from clip_finder_backend.loaders import load_embedding_store
 from clip_finder_backend.progress_manager import ProgressManager
-from clip_finder_backend.embedding_store import Query, SimpleClipEmbeddingStore
+from clip_finder_backend.embedding_store import Query, SimpleClipEmbeddingStore, ShardedEmbeddingStore, EmbeddingStore
 from clip_finder_backend.tasks import perform_search_task, perform_get_images_by_tags_task
 from clip_finder_backend.thumbnail_provider import ThumbnailProvider
 from clip_finder_backend.types import ZeroShotClassifyRequest, ImageResponse
@@ -33,29 +34,6 @@ logger = logging.getLogger(__name__)
 
 print("making embedding store")
 
-def load_model():
-    if os.environ.get("CLIPFINDER_USE_MOCK_CLIP_MODEL", "0") == "1":
-        print("using mock clip model because CLIPFINDER_USE_MOCK_CLIP_MODEL=1")
-        from clip_finder_backend.mock_clip_model import MockClipModel
-        return MockClipModel()
-
-    model_type = os.environ.get("CLIPFINDER_CLIP_MODEL_TYPE", "MobileCLIP-S1")
-    pretrained = os.environ.get("CLIPFINDER_CLIP_MODEL_PRETRAINED", "datacompdr")
-    weights_pt_path = os.environ.get("CLIPFINDER_CLIP_MODEL_WEIGHTS_PT_PATH", None)
-    print("loading model:", model_type, "pretrained:", pretrained, "custom weights:", weights_pt_path)
-    print("Set env vars CLIPFINDER_CLIP_MODEL_TYPE, CLIPFINDER_CLIP_MODEL_PRETRAINED, CLIPFINDER_CLIP_MODEL_WEIGHTS_PT_PATH to change")
-    from clip_finder_backend.clip_modelling import ClipModel
-    return ClipModel(clip_name=model_type, pretrained=pretrained, weights_pt_path=weights_pt_path).load_model()
-
-
-def load_embedding_store():
-    store_file = os.environ.get("CLIPFINDER_CLIP_MODEL_STORE_FILE", None)
-    if store_file is None:
-        raise RuntimeError("env var CLIPFINDER_CLIP_MODEL_STORE_FILE must point to a path to load the embedding store")
-
-    print(f"loading existing embedding store from {store_file}")
-    clip_model = AutoloadingClipModel(load_model=load_model)
-    return SimpleClipEmbeddingStore(clip_model=clip_model, store_file=store_file, store_device='mps')
 embedding_store = load_embedding_store()
 
 print("making thumbnail provider")

@@ -521,9 +521,9 @@ def _load_chunked_store(store_folder: str, store_device='cpu', shard_size: int =
 
     def add_shard(paths, embeddings):
         shard = SimpleClipEmbeddingStore(clip_model=None, store_file=None, store_device=store_device, store_file_identifier='shard__', bare_mode=True)
-        shard.image_embeddings = shard_embeddings
-        shard.image_paths = shard_paths
-        shard.image_ids = []
+        shard.image_embeddings = embeddings
+        shard.image_paths = paths
+        shard.image_ids = [str(uuid.uuid4()) for _ in range(len(shard_paths))]
         shard.image_hashes = []
         shards.append(shard)
 
@@ -553,6 +553,10 @@ def _load_chunked_store(store_folder: str, store_device='cpu', shard_size: int =
 
 class ShardedEmbeddingStore(EmbeddingStore):
 
+    @property
+    def image_paths(self) -> List[str]:
+        return self.editable_shard.image_paths
+
     @staticmethod
     def from_weaviate_dump_chunks(chunks_folder: str,
                                   clip_model: ClipModel=None,
@@ -564,6 +568,12 @@ class ShardedEmbeddingStore(EmbeddingStore):
     def __init__(self, clip_model: ClipModel, shards: list[SimpleClipEmbeddingStore]):
         self.clip_model = clip_model
         self.shards = shards
+        self.editable_shard: SimpleClipEmbeddingStore|None = None
+
+    def add_shard(self, shard: SimpleClipEmbeddingStore, editable=False):
+        self.shards.append(shard)
+        if editable:
+            self.editable_shard = shard
 
     def get_image_embeddings(self, paths: list[str]) -> tuple[list[str], torch.Tensor]:
         result_paths = []
@@ -636,7 +646,10 @@ class ShardedEmbeddingStore(EmbeddingStore):
         return False
 
     def add_images(self, paths: list[str]) -> torch.Tensor:
-        raise NotImplementedError()
+        if self.editable_shard:
+            return self.editable_shard.add_images(paths)
+        else:
+            raise RuntimeError("cannot add images, no editable shard set")
 
 
 def ___recover_natural_case_from_lowercase_paths(paths: list[str]) -> list[str]:
